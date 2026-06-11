@@ -7,9 +7,9 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Wiki - GitHub Pages版</title>
+    <title>「Glight」-微光维基-github-v2.7</title>
     <!-- 构建时间戳，用于确认版本 -->
-    <meta name="wiki-build" content="v2-fix3">
+    <meta name="wiki-build" content="v2-fix4">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -397,18 +397,100 @@
         // ==================== 初始化 ====================
         async init() {
             // 版本标记 - 在控制台输入 __WIKI_VERSION__ 可查看
-            window.__WIKI_VERSION__ = 'v2-fix3';
+            window.__WIKI_VERSION__ = 'v2-fix4';
             console.log('[Wiki] 版本:', window.__WIKI_VERSION__);
             console.log('[Wiki] 页面URL:', window.location.href);
 
-            // 显示加载状态
-            this.showLoadingState('正在加载 Wiki 数据...');
+            // 步骤1：先尝试从本地缓存加载，实现秒开
+            let cacheLoaded = false;
+            try {
+                const cached = localStorage.getItem('wiki_data_cache');
+                const cacheTime = localStorage.getItem('wiki_data_cache_time');
+                if (cached) {
+                    const cacheAge = cacheTime ? (Date.now() - parseInt(cacheTime)) : Infinity;
+                    const cacheAgeMinutes = Math.round(cacheAge / 60000);
+                    console.log('[Wiki] 发现本地缓存，年龄:', cacheAgeMinutes, '分钟');
+                    const cacheData = JSON.parse(cached);
+                    if (this.validateData(cacheData).valid) {
+                        Object.assign(this.data, cacheData);
+                        this._loaded = true;
+                        cacheLoaded = true;
+                        console.log('[Wiki] 已从本地缓存加载，条目数:', this.data.entries.length);
+                        // 立即渲染UI，无需等待网络
+                        this.hideLoadingState();
+                        this.setupUI();
+                        this.router('home');
+                        this.initKeyboardListeners();
+                        if (cacheAgeMinutes < 60) {
+                            // 缓存不到1小时，直接返回，后台静默更新
+                            this.backgroundRefresh();
+                            return;
+                        }
+                        // 缓存超过1小时，显示加载状态同时更新
+                        this.showLoadingState('正在检查更新...');
+                    }
+                }
+            } catch (e) {
+                console.log('[Wiki] 本地缓存读取失败:', e.message);
+            }
 
+            if (!cacheLoaded) {
+                this.showLoadingState('正在加载 Wiki 数据...');
+            }
+
+            // 步骤2：从网络加载最新数据
+            const loadedData = await this.fetchFromNetwork();
+
+            this.hideLoadingState();
+
+            if (loadedData) {
+                const validation = this.validateData(loadedData);
+                if (!validation.valid) {
+                    if (!cacheLoaded) {
+                        this.showLoadError('数据格式错误: ' + validation.error);
+                        this._loaded = false;
+                    } else {
+                        console.log('[Wiki] 网络数据格式错误，继续使用缓存');
+                    }
+                } else {
+                    Object.assign(this.data, loadedData);
+                    this._loaded = true;
+                    // 保存到本地缓存
+                    try {
+                        localStorage.setItem('wiki_data_cache', JSON.stringify(loadedData));
+                        localStorage.setItem('wiki_data_cache_time', String(Date.now()));
+                        console.log('[Wiki] 数据已缓存到本地');
+                    } catch (e) {
+                        console.log('[Wiki] 本地缓存保存失败（数据可能过大）:', e.message);
+                    }
+                    if (this.data.settings.customFont) {
+                        document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
+                    }
+                    // 如果之前从缓存加载了，现在用新数据重新渲染
+                    if (cacheLoaded) {
+                        this.setupUI();
+                        this.router('home');
+                        this.showToast('已更新到最新数据', 'success', 2000);
+                    }
+                }
+            } else if (!cacheLoaded) {
+                this.showLoadError('无法加载 data/data.json');
+                this._loaded = false;
+            }
+
+            if (!cacheLoaded) {
+                this.setupUI();
+                this.router('home');
+                this.initKeyboardListeners();
+            }
+        },
+
+        // 从网络获取数据
+        async fetchFromNetwork() {
             let loadError = null;
             let loadedData = null;
             let triedPaths = [];
 
-            // 基于当前页面URL计算正确的数据路径（兼容GitHub Pages子目录部署）
             const pageUrl = new URL(window.location.href);
             const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
             const cacheBuster = '?t=' + Date.now();
@@ -431,9 +513,8 @@
                         const contentType = response.headers.get('content-type') || '';
                         const text = await response.text();
                         console.log('[Wiki] 路径返回内容长度:', text.length, 'content-type:', contentType);
-                        // 验证返回的是JSON而不是HTML（404页面等）
                         if (text.trim().startsWith('<')) {
-                            loadError = `路径返回了HTML页面（可能是404页面），不是JSON数据。`;
+                            loadError = '路径返回了HTML页面（可能是404页面），不是JSON数据。';
                             console.log('[Wiki] 路径返回HTML，跳过:', path);
                             continue;
                         }
@@ -443,45 +524,48 @@
                             console.log('[Wiki] 数据条目数:', loadedData.entries?.length || 0);
                             break;
                         } catch (jsonErr) {
-                            loadError = `路径返回的内容不是有效的JSON格式: ${jsonErr.message}`;
+                            loadError = '路径返回的内容不是有效的JSON格式: ' + jsonErr.message;
                             console.log('[Wiki] JSON解析失败:', path, jsonErr.message);
                             continue;
                         }
-                    } else {
-                        console.log('[Wiki] 路径响应非OK:', path, 'status:', response.status);
                     }
                 } catch (e) {
-                    loadError = `路径加载失败: ${e.message}`;
+                    loadError = '路径加载失败: ' + e.message;
                     console.log('[Wiki] 路径fetch失败:', path, e.message);
                     continue;
                 }
             }
 
-            // 隐藏加载状态
-            this.hideLoadingState();
-
-            if (loadedData) {
-                // 验证数据结构
-                const validation = this.validateData(loadedData);
-                if (!validation.valid) {
-                    this.showLoadError('数据格式错误: ' + validation.error, triedPaths);
-                    this._loaded = false;
-                } else {
-                    Object.assign(this.data, loadedData);
-                    this._loaded = true;
-                    console.log('[Wiki] 数据加载成功，条目数:', this.data.entries.length);
-                    if (this.data.settings.customFont) {
-                        document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
-                    }
-                }
-            } else {
-                this.showLoadError(loadError || '无法加载 data/data.json', triedPaths);
-                this._loaded = false;
+            if (!loadedData && triedPaths.length > 0) {
+                console.log('[Wiki] 所有路径均加载失败');
             }
 
-            this.setupUI();
-            this.router('home');
-            this.initKeyboardListeners();
+            return loadedData;
+        },
+
+        // 后台静默刷新（当缓存有效时，不阻塞UI）
+        async backgroundRefresh() {
+            console.log('[Wiki] 后台检查更新...');
+            const loadedData = await this.fetchFromNetwork();
+            if (loadedData && this.validateData(loadedData).valid) {
+                const newCount = loadedData.entries?.length || 0;
+                const oldCount = this.data.entries?.length || 0;
+                if (newCount !== oldCount) {
+                    console.log('[Wiki] 检测到数据变化，条目数:', oldCount, '->', newCount);
+                    Object.assign(this.data, loadedData);
+                    try {
+                        localStorage.setItem('wiki_data_cache', JSON.stringify(loadedData));
+                        localStorage.setItem('wiki_data_cache_time', String(Date.now()));
+                    } catch (e) {}
+                    this.setupUI();
+                    this.router('home');
+                    this.showToast('Wiki 数据已更新', 'success', 2000);
+                } else {
+                    console.log('[Wiki] 数据无变化');
+                    // 仍然更新时间戳
+                    localStorage.setItem('wiki_data_cache_time', String(Date.now()));
+                }
+            }
         },
 
         // 验证加载的数据结构
@@ -509,8 +593,9 @@
                 <div id="wiki-loading-overlay" class="h-full flex flex-col items-center justify-center fade-in" style="background: var(--color-bg, #f3f4f6);">
                     <div class="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full mx-4 text-center">
                         <div class="mb-4"><i class="fa-solid fa-book-open text-4xl text-indigo-600"></i></div>
-                        <div class="text-lg font-bold text-gray-800 mb-2">Wiki 加载中</div>
-                        <div class="text-sm text-gray-500 mb-4">${message}</div>
+                        <div class="text-lg font-bold text-gray-800 mb-2">「Glight」微光维基</div>
+                        <div class="text-sm text-gray-500 mb-2">${message}</div>
+                        <div class="text-xs text-amber-600 mb-4"><i class="fa-solid fa-clock mr-1"></i>首次加载可能需要几分钟，请耐心等候</div>
                         <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div class="h-full bg-indigo-600 rounded-full" style="width: 30%; animation: wikiLoadingPulse 1.5s ease-in-out infinite;"></div>
                         </div>
