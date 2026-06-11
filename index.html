@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 强制禁用缓存，确保GitHub Pages更新后立即生效 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Wiki - GitHub Pages版</title>
+    <!-- 构建时间戳，用于确认版本 -->
+    <meta name="wiki-build" content="v2-fix3">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -390,45 +396,63 @@
 
         // ==================== 初始化 ====================
         async init() {
+            // 版本标记 - 在控制台输入 __WIKI_VERSION__ 可查看
+            window.__WIKI_VERSION__ = 'v2-fix3';
+            console.log('[Wiki] 版本:', window.__WIKI_VERSION__);
+            console.log('[Wiki] 页面URL:', window.location.href);
+
             // 显示加载状态
             this.showLoadingState('正在加载 Wiki 数据...');
 
             let loadError = null;
             let loadedData = null;
+            let triedPaths = [];
 
             // 基于当前页面URL计算正确的数据路径（兼容GitHub Pages子目录部署）
             const pageUrl = new URL(window.location.href);
             const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
+            const cacheBuster = '?t=' + Date.now();
             const possiblePaths = [
-                new URL('data/data.json', pageUrl.origin + basePath).href,
-                new URL('./data/data.json', pageUrl.href).href,
-                './data/data.json',
-                'data/data.json',
-                '/data/data.json'
+                new URL('data/data.json' + cacheBuster, pageUrl.origin + basePath).href,
+                new URL('./data/data.json' + cacheBuster, pageUrl.href).href,
+                './data/data.json' + cacheBuster,
+                'data/data.json' + cacheBuster,
+                '/data/data.json' + cacheBuster
             ];
 
+            console.log('[Wiki] 尝试加载路径列表:', possiblePaths);
+
             for (const path of possiblePaths) {
+                triedPaths.push(path);
                 try {
                     const response = await fetch(path, { cache: 'no-cache' });
+                    console.log('[Wiki] 路径响应:', path, 'status:', response.status, 'ok:', response.ok);
                     if (response.ok) {
                         const contentType = response.headers.get('content-type') || '';
                         const text = await response.text();
+                        console.log('[Wiki] 路径返回内容长度:', text.length, 'content-type:', contentType);
                         // 验证返回的是JSON而不是HTML（404页面等）
                         if (text.trim().startsWith('<')) {
-                            loadError = `路径 ${path} 返回了HTML页面，不是JSON数据。请确认 data/data.json 文件已上传到仓库。`;
+                            loadError = `路径返回了HTML页面（可能是404页面），不是JSON数据。`;
+                            console.log('[Wiki] 路径返回HTML，跳过:', path);
                             continue;
                         }
                         try {
                             loadedData = JSON.parse(text);
                             console.log('[Wiki] 成功从路径加载数据:', path);
+                            console.log('[Wiki] 数据条目数:', loadedData.entries?.length || 0);
                             break;
                         } catch (jsonErr) {
-                            loadError = `路径 ${path} 返回的内容不是有效的JSON格式: ${jsonErr.message}`;
+                            loadError = `路径返回的内容不是有效的JSON格式: ${jsonErr.message}`;
+                            console.log('[Wiki] JSON解析失败:', path, jsonErr.message);
                             continue;
                         }
+                    } else {
+                        console.log('[Wiki] 路径响应非OK:', path, 'status:', response.status);
                     }
                 } catch (e) {
-                    loadError = `路径 ${path} 加载失败: ${e.message}`;
+                    loadError = `路径加载失败: ${e.message}`;
+                    console.log('[Wiki] 路径fetch失败:', path, e.message);
                     continue;
                 }
             }
@@ -440,17 +464,18 @@
                 // 验证数据结构
                 const validation = this.validateData(loadedData);
                 if (!validation.valid) {
-                    this.showLoadError('数据格式错误: ' + validation.error);
+                    this.showLoadError('数据格式错误: ' + validation.error, triedPaths);
                     this._loaded = false;
                 } else {
                     Object.assign(this.data, loadedData);
                     this._loaded = true;
+                    console.log('[Wiki] 数据加载成功，条目数:', this.data.entries.length);
                     if (this.data.settings.customFont) {
                         document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
                     }
                 }
             } else {
-                this.showLoadError(loadError || '无法加载 data/data.json。请确认文件已上传到正确的位置（与 index.html 同级的 data/ 目录下）。');
+                this.showLoadError(loadError || '无法加载 data/data.json', triedPaths);
                 this._loaded = false;
             }
 
@@ -473,7 +498,6 @@
                     return { valid: false, error: 'entries 数组中的条目格式不正确。缺少 id、type 或 versions 字段。' };
                 }
             }
-            // 关键字段存在即可，其他字段有默认值
             return { valid: true };
         },
 
@@ -501,28 +525,91 @@
         },
 
         // 显示加载错误（在页面上）
-        showLoadError(message) {
+        showLoadError(message, triedPaths) {
             const container = document.getElementById('main-container');
             if (!container) return;
+            const pathsHtml = triedPaths ? triedPaths.map(p => `<div class="text-xs text-gray-400 font-mono truncate">${this.escapeHtml(p)}</div>`).join('') : '';
             container.innerHTML = `
                 <div class="h-full flex flex-col items-center justify-center fade-in p-4" style="background: var(--color-bg, #f3f4f6);">
-                    <div class="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+                    <div class="bg-white rounded-2xl shadow-lg p-8 max-w-lg w-full text-center">
                         <div class="mb-4"><i class="fa-solid fa-triangle-exclamation text-4xl text-amber-500"></i></div>
                         <div class="text-lg font-bold text-gray-800 mb-2">数据加载失败</div>
                         <div class="text-sm text-gray-600 mb-4 leading-relaxed">${this.escapeHtml(message)}</div>
                         <div class="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 mb-4 space-y-1">
                             <div class="font-bold text-gray-700 mb-2">排查建议：</div>
-                            <div>1. 确认 data/data.json 已上传到仓库</div>
+                            <div>1. 确认 data/data.json 已上传到仓库（当前在浏览器可访问吗？）</div>
                             <div>2. 确认文件路径为：<code class="bg-gray-200 px-1 rounded">仓库根目录/data/data.json</code></div>
                             <div>3. 等待 GitHub Pages 部署完成（约 1-2 分钟）</div>
                             <div>4. 尝试强制刷新：<code class="bg-gray-200 px-1 rounded">Ctrl+Shift+R</code></div>
                             <div>5. 检查文件是否为有效的 JSON 格式</div>
+                            <div class="font-bold text-gray-700 mt-2 mb-1">已尝试的路径：</div>
+                            ${pathsHtml}
+                            <div class="font-bold text-gray-700 mt-2">当前页面 URL：</div>
+                            <div class="text-xs text-gray-400 font-mono truncate">${this.escapeHtml(window.location.href)}</div>
                         </div>
-                        <button onclick="location.reload(true)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm">
-                            <i class="fa-solid fa-rotate-right mr-1"></i>刷新页面
-                        </button>
+                        <div class="flex gap-2 justify-center">
+                            <button onclick="location.reload(true)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm">
+                                <i class="fa-solid fa-rotate-right mr-1"></i>刷新页面
+                            </button>
+                            <button onclick="app.showManualLoad()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition text-sm">
+                                <i class="fa-solid fa-upload mr-1"></i>手动粘贴数据
+                            </button>
+                        </div>
                     </div>
                 </div>`;
+        },
+
+        // 手动粘贴数据加载（备选方案）
+        showManualLoad() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center fade-in p-4" style="background: var(--color-bg, #f3f4f6);">
+                    <div class="bg-white rounded-2xl shadow-lg p-8 max-w-lg w-full">
+                        <div class="text-center mb-4">
+                            <i class="fa-solid fa-file-import text-3xl text-indigo-600 mb-2"></i>
+                            <div class="text-lg font-bold text-gray-800">手动加载数据</div>
+                            <div class="text-sm text-gray-500">将 data.json 的内容复制粘贴到下方文本框</div>
+                        </div>
+                        <textarea id="manual-data-input" class="w-full h-48 p-3 border border-gray-300 rounded-lg text-xs font-mono resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="在此粘贴 data.json 的完整内容..."></textarea>
+                        <div class="flex gap-2 mt-4 justify-center">
+                            <button onclick="app.loadManualData()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm">
+                                <i class="fa-solid fa-check mr-1"></i>加载数据
+                            </button>
+                            <button onclick="app.init()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition text-sm">
+                                <i class="fa-solid fa-arrow-left mr-1"></i>返回
+                            </button>
+                        </div>
+                        <div id="manual-load-error" class="hidden mt-3 p-3 bg-red-50 text-red-600 text-xs rounded-lg"></div>
+                    </div>
+                </div>`;
+        },
+
+        loadManualData() {
+            const textarea = document.getElementById('manual-data-input');
+            const errorDiv = document.getElementById('manual-load-error');
+            if (!textarea || !textarea.value.trim()) {
+                if (errorDiv) { errorDiv.textContent = '请输入数据'; errorDiv.classList.remove('hidden'); }
+                return;
+            }
+            try {
+                const data = JSON.parse(textarea.value.trim());
+                const validation = this.validateData(data);
+                if (!validation.valid) {
+                    if (errorDiv) { errorDiv.textContent = '数据格式错误: ' + validation.error; errorDiv.classList.remove('hidden'); }
+                    return;
+                }
+                Object.assign(this.data, data);
+                this._loaded = true;
+                if (this.data.settings.customFont) {
+                    document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
+                }
+                this.setupUI();
+                this.router('home');
+                this.showToast('数据手动加载成功！建议检查 data/data.json 文件路径是否正确。', 'success', 5000);
+            } catch (e) {
+                if (errorDiv) { errorDiv.textContent = 'JSON 解析失败: ' + e.message; errorDiv.classList.remove('hidden'); }
+            }
         },
 
         setupUI() {
