@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wiki - GitHub Pages版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+        :root { --color-primary: #4f46e5; --color-bg: #f3f4f6; --custom-font: 'Noto Sans SC', sans-serif; }
+        body { font-family: var(--custom-font); background-color: var(--color-bg); overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ========== 六边形角色卡片（关系图用） ========== */
+        .hexagon-wrapper { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); transition: all 0.3s ease; cursor: pointer; }
+        .hexagon { width: 140px; height: 160px; background-color: white; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .hexagon.lvl-1 { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+        .hexagon.lvl-2 { background: linear-gradient(135deg, #e0f2fe, #bae6fd); }
+        .hexagon.lvl-3 { background: linear-gradient(135deg, #ffffff, #f3f4f6); }
+        .hexagon.lvl-4 { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); }
+        .hexagon.lvl-5 { background: linear-gradient(135deg, #f9fafb, #f3f4f6); opacity: 0.8; }
+        .hexagon-content { width: 80%; height: 70%; background: white; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+        /* ========== 瀑布流布局 ========== */
+        .masonry-grid { column-count: 1; column-gap: 1rem; }
+        @media (min-width: 640px) { .masonry-grid { column-count: 2; } }
+        @media (min-width: 1024px) { .masonry-grid { column-count: 3; } }
+        @media (min-width: 1280px) { .masonry-grid { column-count: 4; } }
+        .masonry-item { break-inside: avoid; margin-bottom: 1rem; }
+
+        /* ========== 角色徽章 ========== */
+        .role-badge { position: absolute; top: 4px; right: 4px; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; z-index: 10; }
+        .badge-protagonist { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3); }
+        .badge-important { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; box-shadow: 0 2px 4px rgba(14, 165, 233, 0.3); }
+
+        /* ========== 词条编号样式 ========== */
+        .entry-code { font-family: 'Courier New', monospace; font-size: 10px; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
+
+        /* ========== 搜索下拉框 ========== */
+        .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); max-height: 400px; overflow-y: auto; z-index: 1000; margin-top: 8px; border: 1px solid #e5e7eb; }
+        .search-item { padding: 12px 16px; cursor: pointer; transition: all 0.2s; border-bottom: 1px solid #f3f4f6; }
+        .search-item:hover { background: #f9fafb; }
+        .search-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+        .search-tag.past { background: #e5e7eb; color: #6b7280; }
+        .search-tag.future { background: #fde68a; color: #92400e; }
+        .search-tag.current { background: #dbeafe; color: #1e40af; }
+
+        /* ========== 剧情梗概角色引用 ========== */
+        .synopsis-entry-ref { display: inline-flex !important; align-items: center; gap: 4px; padding: 2px 6px; background-color: #e0e7ff; color: #4338ca; border-radius: 4px; font-size: 0.875rem; cursor: pointer; margin: 0 2px; border: none; font-weight: 500; vertical-align: middle; line-height: 1.4; }
+        .synopsis-entry-ref:hover { background-color: #c7d2fe; text-decoration: none; }
+        .synopsis-entry-ref i { font-size: 0.75rem; color: #6366f1; margin-right: 2px; }
+
+        /* ========== 公告横幅 ========== */
+        .announcement-banner { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 16px; position: relative; overflow: hidden; }
+        .announcement-banner::before { content: ''; position: absolute; top: -50%; right: -10%; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+
+        /* ========== 首页剧情梗概入口 ========== */
+        .synopsis-home-entry { background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.3s ease; border: 2px solid transparent; }
+        .synopsis-home-entry:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(251, 191, 36, 0.3); border-color: #f59e0b; }
+
+        /* ========== 设定分类区域 ========== */
+        .setting-category-section { margin-bottom: 2rem; }
+        .setting-category-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; }
+        .setting-category-title { font-size: 1.125rem; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 0.5rem; }
+        .setting-count-badge { background: #e0e7ff; color: #4338ca; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .setting-more-btn { color: #4f46e5; font-size: 0.875rem; font-weight: 500; display: flex; align-items: center; gap: 0.25rem; cursor: pointer; transition: color 0.2s; }
+        .setting-more-btn:hover { color: #3730a3; }
+
+        /* ========== 剧情梗概系统 ========== */
+        .synopsis-view-container { height: 100%; overflow: hidden; position: relative; background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); }
+        .synopsis-view-list { height: 100%; overflow-y: auto; padding: 40vh 20px; scroll-behavior: smooth; }
+        .synopsis-view-item { background: rgba(255, 255, 255, 0.05); border-radius: 16px; margin-bottom: 24px; padding: 20px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .synopsis-view-item.active { background: rgba(255, 255, 255, 0.95); transform: scale(1.02); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-color: #4f46e5; }
+        .synopsis-view-item.inactive { opacity: 0.4; transform: scale(0.95); }
+        .synopsis-view-num { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .synopsis-view-title { font-size: 18px; font-weight: 700; color: #e2e8f0; }
+        .synopsis-view-item.active .synopsis-view-title { font-size: 24px; color: #1f2937; }
+        .synopsis-view-image { width: 100%; max-height: 200px; object-fit: cover; border-radius: 12px; margin-bottom: 16px; transition: all 0.4s ease; }
+        .synopsis-view-item.active .synopsis-view-image { max-height: 300px; }
+        .synopsis-view-content { font-size: 14px; line-height: 1.8; color: #cbd5e1; transition: all 0.4s ease; }
+        .synopsis-view-item.active .synopsis-view-content { font-size: 16px; color: #374151; }
+        .synopsis-view-btn { width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 18px; color: #4f46e5; }
+        .synopsis-view-btn:hover { transform: scale(1.1); background: white; }
+        .synopsis-switch-time-btn { position: fixed !important; bottom: 80px !important; right: 20px !important; top: auto !important; left: auto !important; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 10px 16px; border-radius: 24px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); z-index: 1000; transition: opacity 0.2s, transform 0.2s; }
+        .synopsis-switch-time-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.5); }
+
+        /* 剧情梗概引用样式（词条详情页内） */
+        .synopsis-ref { color: #4f46e5; font-weight: 500; cursor: pointer; border-bottom: 1px dashed #4f46e5; transition: all 0.2s; }
+        .synopsis-ref:hover { background: #eef2ff; padding: 0 4px; border-radius: 4px; }
+
+        /* 词条内剧情引用悬浮窗样式 */
+        .body-dimmed { position: relative; }
+        .body-dimmed::before { content: ''; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 9990; pointer-events: none; }
+        .synopsis-tooltip { position: fixed; background: white; border-radius: 16px; padding: 20px; max-width: 450px; width: 90%; max-height: 70vh; overflow-y: auto; z-index: 9999; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); opacity: 0; visibility: hidden; transition: all 0.3s ease; pointer-events: auto; }
+        .synopsis-tooltip.show { opacity: 1; visibility: visible; }
+        .synopsis-tooltip:hover { opacity: 1; visibility: visible; }
+        .synopsis-tooltip-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+        .synopsis-tooltip-num { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .synopsis-tooltip-title { font-size: 16px; font-weight: 700; color: #1f2937; flex: 1; }
+        .synopsis-tooltip-image { width: 100%; max-height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 12px; }
+        .synopsis-tooltip-content { font-size: 14px; line-height: 1.8; color: #4b5563; margin-bottom: 16px; }
+
+        /* ========== 关系图谱 ========== */
+        .graph-container { position: relative; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); cursor: grab; }
+        .graph-container:active { cursor: grabbing; }
+        .graph-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        .graph-nodes { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+        .graph-controls { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+        .graph-control-btn { width: 40px; height: 40px; border-radius: 50%; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .graph-control-btn:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+        /* 可拖拽信息面板 */
+        .draggable-panel { position: absolute; top: 20px; left: 20px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 16px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); z-index: 100; cursor: move; min-width: 200px; max-width: 300px; }
+        .draggable-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+        .draggable-handle { cursor: move; color: #9ca3af; }
+
+        /* ========== 时间轴切换提示 ========== */
+        .timeline-switch-toast { position: fixed; top: 80px; right: 20px; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 12px 20px; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4); z-index: 9999; transition: all 0.3s ease; opacity: 0; transform: translateY(-20px); pointer-events: none; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .timeline-switch-toast.show { opacity: 1; transform: translateY(0); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 3px; }
+
+        /* 词条索引链接样式 */
+        .entry-index-link { color: #4f46e5; text-decoration: none; border-bottom: 1px dashed #4f46e5; cursor: pointer; transition: all 0.2s; }
+        .entry-index-link:hover { background: #eef2ff; padding: 0 4px; border-radius: 4px; }
+
+        /* 空状态提示 */
+        .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+        .empty-state i { font-size: 48px; margin-bottom: 16px; display: block; }
+        .empty-state h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #6b7280; }
+        .empty-state p { font-size: 14px; line-height: 1.6; }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-gray-800">
+
+    <!-- 全局状态提示 -->
+    <div id="save-toast" class="fixed top-5 right-5 z-50 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none flex items-center gap-2 transition-opacity">
+        <i class="fa-solid fa-check-circle"></i><span>已保存</span>
+    </div>
+    <div id="timeline-switch-toast" class="timeline-switch-toast">
+        <i class="fa-solid fa-clock-rotate-left"></i><span id="timeline-switch-text">时间轴已切换</span>
+    </div>
+
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm z-50 px-4 py-3 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-3 overflow-hidden">
+            <div class="bg-indigo-600 text-white p-2 rounded-lg shrink-0"><i class="fa-solid fa-book-open"></i></div>
+            <div class="min-w-0">
+                <h1 id="wiki-title-display" class="text-lg font-bold text-gray-900 truncate">未命名 Wiki</h1>
+                <p id="wiki-subtitle-display" class="text-[10px] text-gray-500 truncate hidden">声明文本占位</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 relative">
+            <div class="relative hidden sm:block">
+                <input type="text" id="global-search" placeholder="搜索编号或名称..."
+                    class="pl-8 pr-3 py-1.5 bg-gray-100 border-none rounded-full text-sm focus:ring-2 focus:ring-indigo-500 w-32 sm:w-48 transition-all"
+                    oninput="app.handleSearchInput(this.value)"
+                    onfocus="app.showSearchDropdown()"
+                    onblur="setTimeout(() => app.hideSearchDropdown(), 200)">
+                <i class="fa-solid fa-search absolute left-3 top-2 text-gray-400 text-xs"></i>
+                <div id="search-dropdown" class="search-dropdown hidden"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 时间轴选择条 -->
+    <div id="timeline-bar" class="bg-indigo-50 border-b border-indigo-100 px-4 py-2 flex items-center gap-3 shrink-0 text-sm hidden">
+        <span class="text-indigo-700 font-medium whitespace-nowrap"><i class="fa-solid fa-clock-rotate-left mr-1"></i>时间轴:</span>
+        <select id="timeline-selector" onchange="app.setTimeline(this.value)" class="flex-1 bg-white border border-indigo-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-indigo-500">
+            <option value="latest">最新进度 (全部内容)</option>
+        </select>
+    </div>
+
+    <!-- 主内容区 -->
+    <main id="main-container" class="flex-1 overflow-hidden relative bg-gray-50"></main>
+
+    <!-- 底部导航 -->
+    <nav class="bg-white border-t border-gray-200 shrink-0 z-50">
+        <div class="max-w-5xl mx-auto flex justify-around items-center h-14">
+            <button onclick="app.router('home')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="home">
+                <i class="fa-solid fa-house text-lg"></i><span class="text-[10px]">首页</span>
+            </button>
+            <button onclick="app.router('characters')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="characters">
+                <i class="fa-solid fa-users text-lg"></i><span class="text-[10px]">角色</span>
+            </button>
+            <button onclick="app.router('non-characters')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="non-characters">
+                <i class="fa-solid fa-map text-lg"></i><span class="text-[10px]">设定</span>
+            </button>
+            <button onclick="app.router('graph')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="graph">
+                <i class="fa-solid fa-diagram-project text-lg"></i><span class="text-[10px]">关系</span>
+            </button>
+            <button onclick="app.router('synopsis')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="synopsis">
+                <i class="fa-solid fa-film text-lg"></i><span class="text-[10px]">剧情</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ========== Templates ========== -->
+
+    <!-- 首页模板 -->
+    <template id="tpl-home">
+        <div class="h-full overflow-y-auto p-4 fade-in">
+            <div class="max-w-3xl mx-auto space-y-6 pb-20">
+                <div id="announcement-section" class="hidden">
+                    <div class="announcement-banner" onclick="app.viewAnnouncement()">
+                        <div class="flex items-center gap-2 mb-2"><i class="fa-solid fa-bullhorn"></i><span class="font-bold text-sm">最新公告</span></div>
+                        <h3 id="announcement-title" class="text-lg font-bold mb-1"></h3>
+                        <p id="announcement-preview" class="text-sm opacity-90 line-clamp-2"></p>
+                        <p id="announcement-meta" class="text-xs opacity-75 mt-2 flex items-center gap-2"></p>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                    <div class="absolute top-0 right-0 opacity-10 transform translate-x-10 -translate-y-10"><i class="fa-solid fa-dragon text-9xl"></i></div>
+                    <h2 id="welcome-title" class="text-2xl font-bold mb-2 relative z-10">欢迎来到 Wiki</h2>
+                    <p id="welcome-subtitle" class="opacity-90 mb-4 text-sm relative z-10">探索角色、世界观与错综复杂的关系网。</p>
+                </div>
+                <div onclick="app.router('synopsis')" class="synopsis-home-entry flex items-center justify-between p-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-11 h-11 rounded-xl bg-white flex items-center justify-center text-2xl text-amber-600" style="margin-bottom:0;"><i class="fa-solid fa-film"></i></div>
+                        <div><div class="text-amber-800 font-bold text-base mb-1">剧情梗概</div><div class="text-amber-700 text-xs">查看完整故事线</div></div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-amber-600 text-lg"></i>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div onclick="app.router('characters')" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center gap-2 active:scale-95 transition cursor-pointer">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg"><i class="fa-solid fa-user-astronaut"></i></div>
+                        <span class="font-medium text-gray-700 text-xs">角色</span>
+                    </div>
+                    <div onclick="app.router('non-characters')" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center gap-2 active:scale-95 transition cursor-pointer">
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg"><i class="fa-solid fa-tree"></i></div>
+                        <span class="font-medium text-gray-700 text-xs">设定</span>
+                    </div>
+                    <div onclick="app.router('graph')" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center gap-2 active:scale-95 transition cursor-pointer">
+                        <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-lg"><i class="fa-solid fa-circle-nodes"></i></div>
+                        <span class="font-medium text-gray-700 text-xs">关系</span>
+                    </div>
+                </div>
+                <div id="home-content-area" class="space-y-3"></div>
+                <div id="history-section" class="hidden">
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>最近浏览</h3>
+                    <div id="history-list" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 列表模板 -->
+    <template id="tpl-list">
+        <div class="h-full overflow-y-auto p-4 fade-in">
+            <div class="flex justify-between items-center mb-4 max-w-7xl mx-auto">
+                <div class="flex items-center gap-2">
+                    <h2 id="list-title" class="text-xl font-bold text-gray-800">列表</h2>
+                    <span id="list-count" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">0</span>
+                </div>
+            </div>
+            <div id="masonry-container" class="max-w-7xl mx-auto pb-20"></div>
+        </div>
+    </template>
+
+    <!-- 详情查看模板 -->
+    <template id="tpl-detail-view">
+        <div class="h-full overflow-y-auto bg-white fade-in">
+            <div class="max-w-3xl mx-auto min-h-full p-5 relative pb-20">
+                <div class="sticky top-0 bg-white/90 backdrop-blur z-10 py-2 mb-4 flex justify-between items-center border-b border-gray-100">
+                    <button onclick="app.goBack()" class="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm"><i class="fa-solid fa-arrow-left"></i> 返回</button>
+                    <div class="flex gap-2 items-center">
+                        <span id="detail-code" class="entry-code"></span>
+                        <span id="detail-version-badge" class="hidden px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">版本: <span id="detail-version-name">默认</span></span>
+                    </div>
+                </div>
+                <div id="detail-content" class="prose prose-sm max-w-none"></div>
+                <div id="related-characters-section" class="hidden mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-people-arrows text-indigo-600"></i>相关角色</h3>
+                    <div id="related-characters-list" class="flex flex-wrap gap-2"></div>
+                </div>
+                <div id="version-switch-hint" class="hidden mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <div class="text-sm text-indigo-800 font-medium mb-2">该角色在当前时间有多个版本：</div>
+                    <div id="version-switch-list" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 关系图谱模板 -->
+    <template id="tpl-graph">
+        <div class="h-full flex flex-col fade-in">
+            <div id="graph-container" class="graph-container flex-1">
+                <svg id="graph-svg" class="graph-svg"></svg>
+                <div id="graph-nodes" class="graph-nodes"></div>
+                <div class="graph-controls">
+                    <button onclick="app.zoomIn()" class="graph-control-btn" title="放大"><i class="fa-solid fa-plus"></i></button>
+                    <button onclick="app.zoomOut()" class="graph-control-btn" title="缩小"><i class="fa-solid fa-minus"></i></button>
+                    <button onclick="app.resetGraphView()" class="graph-control-btn" title="重置视图"><i class="fa-solid fa-compress"></i></button>
+                </div>
+                <div id="graph-info-panel" class="draggable-panel">
+                    <div class="draggable-panel-header">
+                        <span class="text-sm font-bold text-gray-700">角色信息</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.togglePanelCollapse()" class="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-minus text-xs"></i></button>
+                            <div class="draggable-handle w-6 h-6 flex items-center justify-center"><i class="fa-solid fa-grip-vertical text-xs"></i></div>
+                        </div>
+                    </div>
+                    <div id="panel-content">
+                        <div id="selected-character-info" class="hidden">
+                            <div id="selected-char-name" class="font-bold text-gray-800 mb-2"></div>
+                            <div id="selected-char-relation" class="text-sm text-gray-600"></div>
+                        </div>
+                        <div id="graph-empty-hint" class="text-sm text-gray-500 text-center py-4">
+                            <i class="fa-solid fa-hand-pointer mb-2 block"></i>点击角色查看关系
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 剧情梗概浏览模板 -->
+    <template id="tpl-synopsis">
+        <div class="h-full flex flex-col fade-in synopsis-view-container">
+            <div id="synopsis-view-list" class="synopsis-view-list"></div>
+            <div class="synopsis-view-controls" style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:100;">
+                <button onclick="app.navigateSynopsis(-1)" class="synopsis-view-btn"><i class="fa-solid fa-arrow-up"></i></button>
+                <button onclick="app.navigateSynopsis(1)" class="synopsis-view-btn"><i class="fa-solid fa-arrow-down"></i></button>
+            </div>
+            <button id="synopsis-switch-time-btn" onclick="app.switchToSynopsisTime()" class="synopsis-switch-time-btn hidden">切换到当前时间轴</button>
+        </div>
+    </template>
+
+    <!-- 剧情引用悬浮窗模板 -->
+    <template id="tpl-synopsis-tooltip">
+        <div id="synopsis-tooltip-box" class="synopsis-tooltip">
+            <div class="synopsis-tooltip-header">
+                <span id="tooltip-chapter-num" class="synopsis-tooltip-num"></span>
+                <span id="tooltip-chapter-title" class="synopsis-tooltip-title"></span>
+            </div>
+            <img id="tooltip-chapter-image" class="synopsis-tooltip-image hidden" alt="">
+            <div id="tooltip-chapter-content" class="synopsis-tooltip-content"></div>
+            <div style="text-align:center;padding-top:12px;border-top:1px solid #e5e7eb;">
+                <span style="font-size:12px;color:#6b7280;font-style:italic;">点击查看完整剧情</span>
+            </div>
+        </div>
+    </template>
+
+    <!-- 空数据提示模板 -->
+    <template id="tpl-empty">
+        <div class="h-full overflow-y-auto p-4 fade-in">
+            <div class="max-w-3xl mx-auto pb-20">
+                <div class="empty-state">
+                    <i class="fa-solid fa-folder-open text-gray-300"></i>
+                    <h3 id="empty-title">暂无数据</h3>
+                    <p id="empty-desc">管理员尚未添加内容，请稍后再来。</p>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- ========== JavaScript ========== -->
+    <script>
+    // ==================== 核心应用 ====================
+    const app = {
+        // 数据存储结构（与本地版兼容）
+        data: {
+            settings: { name: '未命名 Wiki', subtitle: '', welcomeTitle: '欢迎来到 Wiki', welcomeSubtitle: '探索角色、世界观与错综复杂的关系网。', customFont: null, homeCustomTitle: '首页自定义内容' },
+            entries: [],
+            camps: [],
+            chapters: [],
+            homeContent: [],
+            announcements: [],
+            history: [],
+            synopsis: [],
+            currentView: 'home',
+            editingId: null,
+            viewingVersionId: null,
+            currentTimeline: 'latest',
+            codeCounters: { C: 0, N: 0 },
+            graphState: { scale: 1, translateX: 0, translateY: 0 },
+            synopsisViewIndex: 0
+        },
+        _loaded: false,
+        _keyboardHandler: null,
+        tooltipHoverTimeout: null,
+        tooltipLeaveTimeout: null,
+        currentTooltipChapterId: null,
+        tooltipClickOutsideHandler: null,
+        confirmedFutureEntries: new Set(),
+
+        // ==================== 初始化 ====================
+        async init() {
+            try {
+                // 尝试从 data/data.json 加载数据
+                const response = await fetch('./data/data.json');
+                if (!response.ok) throw new Error('data.json not found');
+                const loadedData = await response.json();
+                // 合并加载的数据
+                Object.assign(this.data, loadedData);
+                this._loaded = true;
+                // 应用自定义字体
+                if (this.data.settings.customFont) {
+                    document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
+                }
+            } catch (e) {
+                console.log('[Init] 未找到数据文件或加载失败:', e.message);
+                this._loaded = false;
+            }
+            this.setupUI();
+            this.router('home');
+            this.initKeyboardListeners();
+        },
+
+        setupUI() {
+            // 设置标题
+            const titleEl = document.getElementById('wiki-title-display');
+            const subtitleEl = document.getElementById('wiki-subtitle-display');
+            if (titleEl) titleEl.textContent = this.data.settings.name || '未命名 Wiki';
+            if (subtitleEl) {
+                if (this.data.settings.subtitle) {
+                    subtitleEl.textContent = this.data.settings.subtitle;
+                    subtitleEl.classList.remove('hidden');
+                } else {
+                    subtitleEl.classList.add('hidden');
+                }
+            }
+            // 设置时间轴选择器
+            const selector = document.getElementById('timeline-selector');
+            if (selector && this.data.chapters && this.data.chapters.length > 0) {
+                const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+                sortedChapters.forEach(ch => {
+                    const opt = document.createElement('option');
+                    opt.value = ch.id;
+                    opt.textContent = `${this.formatChapterNum(ch.num)} ${ch.title || ''}`;
+                    selector.appendChild(opt);
+                });
+                document.getElementById('timeline-bar').classList.remove('hidden');
+            }
+        },
+
+        // ==================== 路由 ====================
+        router(view, skipHistory = false) {
+            this.data.currentView = view;
+            const container = document.getElementById('main-container');
+            container.innerHTML = '';
+
+            // 更新底部导航高亮
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const target = btn.dataset.target;
+                if (target === view || (view === 'detail' && target === 'characters') || (view === 'non-characters' && target === 'non-characters')) {
+                    btn.classList.add('text-indigo-600');
+                    btn.classList.remove('text-gray-500');
+                } else {
+                    btn.classList.remove('text-indigo-600');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+
+            // 关闭可能打开的tooltip
+            this.closeSynopsisTooltip();
+
+            switch (view) {
+                case 'home': this.renderHome(container); break;
+                case 'characters': this.renderList(container, 'character'); break;
+                case 'non-characters': this.renderSettingsGrouped(container); break;
+                case 'graph': this.renderGraph(container); break;
+                case 'detail': this.renderDetail(container); break;
+                case 'synopsis': this.renderSynopsisView(container); break;
+                default: this.renderHome(container);
+            }
+        },
+
+        // ==================== 空状态检查 ====================
+        isDataEmpty() {
+            return !this._loaded || (!this.data.entries || this.data.entries.length === 0);
+        },
+
+        showEmptyState(container, title, desc) {
+            const tpl = document.getElementById('tpl-empty');
+            const clone = tpl.content.cloneNode(true);
+            const titleEl = clone.getElementById('empty-title');
+            const descEl = clone.getElementById('empty-desc');
+            if (titleEl) titleEl.textContent = title || '暂无数据';
+            if (descEl) descEl.textContent = desc || '管理员尚未添加内容，请检查存档文件是否正确放置。';
+            container.appendChild(clone);
+        },
+
+        // ==================== 首页 ====================
+        renderHome(container) {
+            const tpl = document.getElementById('tpl-home');
+            const clone = tpl.content.cloneNode(true);
+
+            // 欢迎标题
+            const welcomeTitle = clone.getElementById('welcome-title');
+            const welcomeSubtitle = clone.getElementById('welcome-subtitle');
+            if (welcomeTitle) welcomeTitle.textContent = this.data.settings.welcomeTitle || '欢迎来到 Wiki';
+            if (welcomeSubtitle) welcomeSubtitle.textContent = this.data.settings.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
+
+            // 公告
+            const activeAnn = this.data.announcements?.find(a => a.isActive);
+            if (activeAnn) {
+                const annSection = clone.getElementById('announcement-section');
+                const annTitle = clone.getElementById('announcement-title');
+                const annPreview = clone.getElementById('announcement-preview');
+                const annMeta = clone.getElementById('announcement-meta');
+                if (annSection) annSection.classList.remove('hidden');
+                if (annTitle) annTitle.textContent = activeAnn.title || '';
+                if (annPreview) annPreview.textContent = this.stripHtml(activeAnn.content || '');
+                if (annMeta) annMeta.innerHTML = `<i class="fa-solid fa-user"></i> ${activeAnn.author || '匿名'} <i class="fa-solid fa-calendar"></i> ${activeAnn.date || ''}`;
+            }
+
+            // 首页自定义内容
+            const homeContentArea = clone.getElementById('home-content-area');
+            if (this.data.homeContent && this.data.homeContent.length > 0) {
+                this.data.homeContent.forEach(item => {
+                    if (item.type === 'entry-ref' && item.entryId) {
+                        const entry = this.data.entries.find(e => e.id === item.entryId);
+                        if (entry) {
+                            const version = entry.versions.find(v => v.vid === item.versionId) || this.getVisibleVersion(entry) || entry.versions[0];
+                            if (version) {
+                                const card = document.createElement('div');
+                                card.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition';
+                                card.innerHTML = `
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-bookmark"></i></div>
+                                        <div><div class="font-bold text-gray-800 text-sm">${item.title || version.title}</div><div class="text-xs text-gray-500">${entry.code}</div></div>
+                                    </div>`;
+                                card.onclick = () => this.openEntry(entry.id, item.versionId);
+                                homeContentArea.appendChild(card);
+                            }
+                        }
+                    } else if (item.type === 'text') {
+                        const div = document.createElement('div');
+                        div.className = 'bg-white rounded-xl shadow-sm border border-gray-200 p-4 text-sm text-gray-600';
+                        div.textContent = item.content || item.title || '';
+                        homeContentArea.appendChild(div);
+                    }
+                });
+            }
+
+            // 历史记录
+            this.renderHistory(clone);
+
+            container.appendChild(clone);
+        },
+
+        renderHistory(parent) {
+            const historySection = parent.getElementById('history-section');
+            const historyList = parent.getElementById('history-list');
+            if (!historySection || !historyList) return;
+            if (this.data.history && this.data.history.length > 0) {
+                historySection.classList.remove('hidden');
+                const recent = this.data.history.slice(-10).reverse();
+                recent.forEach(h => {
+                    const entry = this.data.entries.find(e => e.id === h.id);
+                    if (!entry) return;
+                    const version = this.getVisibleVersion(entry);
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 cursor-pointer hover:border-indigo-300 transition';
+                    item.innerHTML = `
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs text-gray-500 shrink-0"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                        <div class="min-w-0"><div class="text-sm font-medium text-gray-700 truncate">${version?.title || entry.code}</div><div class="text-xs text-gray-400">${entry.code}</div></div>`;
+                    item.onclick = () => this.openEntry(entry.id);
+                    historyList.appendChild(item);
+                });
+            }
+        },
+
+        // ==================== 列表渲染 ====================
+        renderList(container, type) {
+            if (this.isDataEmpty()) {
+                this.showEmptyState(container, '暂无角色数据', '管理员尚未添加角色，请检查存档文件。');
+                return;
+            }
+            const tpl = document.getElementById('tpl-list');
+            const clone = tpl.content.cloneNode(true);
+            const masonry = clone.getElementById('masonry-container');
+            const countBadge = clone.getElementById('list-count');
+            const title = clone.getElementById('list-title');
+
+            container.appendChild(clone);
+
+            masonry.className = 'max-w-7xl mx-auto pb-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4';
+            if (title) title.textContent = type === 'character' ? '角色' : '设定';
+
+            let items = this.data.entries.filter(e => e.type === type);
+            items.sort((a, b) => {
+                const statusA = this.getCharacterDisplayStatus(a);
+                const statusB = this.getCharacterDisplayStatus(b);
+                const pinnedA = this.isCharacterPinned(a);
+                const pinnedB = this.isCharacterPinned(b);
+                if (pinnedA && statusA !== 'future' && (!pinnedB || statusB === 'future')) return -1;
+                if (pinnedB && statusB !== 'future' && (!pinnedA || statusA === 'future')) return 1;
+                if (statusA === 'future' && statusB !== 'future') return 1;
+                if (statusA !== 'future' && statusB === 'future') return -1;
+                const levelA = this.getSortLevel(a, statusA);
+                const levelB = this.getSortLevel(b, statusB);
+                if (levelA !== levelB) return levelA - levelB;
+                if (statusA === 'missing' && statusB !== 'missing') return 1;
+                if (statusA !== 'missing' && statusB === 'missing') return -1;
+                return a.code.localeCompare(b.code);
+            });
+
+            if (countBadge) countBadge.textContent = items.length;
+
+            if (items.length === 0) {
+                masonry.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">暂无数据</div>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            items.forEach(entry => {
+                let version = this.getVisibleVersion(entry);
+                if (!version) version = entry.versions?.[entry.versions.length - 1];
+                const status = this.getCharacterDisplayStatus(entry);
+                const isPinned = this.isCharacterPinned(entry);
+                if (version) {
+                    const card = this.createEntryCard(entry, version, status, isPinned);
+                    if (card) fragment.appendChild(card);
+                }
+            });
+            masonry.appendChild(fragment);
+        },
+
+        createEntryCard(entry, version, status = 'normal', isPinned = false) {
+            const div = document.createElement('div');
+            let statusClass = '';
+            let statusStyle = '';
+            let subtitleText = version.subtitle || '';
+
+            if (status === 'future') {
+                statusClass = 'opacity-50 future-character';
+                statusStyle = 'filter: grayscale(100%) brightness(0.7);';
+                subtitleText = '该角色还潜藏于阴影中。';
+            } else if (status === 'missing') {
+                statusClass = 'opacity-60 missing-character';
+                statusStyle = 'filter: brightness(0.6) contrast(0.8);';
+            }
+
+            div.className = `bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 active:scale-95 flex flex-col w-3/4 mx-auto relative ${statusClass}`;
+            if (statusStyle) div.style.cssText = statusStyle;
+
+            div.onclick = () => {
+                if (status === 'future') this.showFutureConfirmDialog(entry, version);
+                else if (status === 'missing') {
+                    const missingInfo = this.getMissingInfo(entry);
+                    if (missingInfo) this.showMissingConfirmDialog(entry, missingInfo);
+                    else this.openEntry(entry.id);
+                } else this.openEntry(entry.id);
+            };
+
+            // 置顶标记
+            if (isPinned && status !== 'future') {
+                const pinBadge = document.createElement('div');
+                pinBadge.className = 'absolute -top-2 -left-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg z-20';
+                pinBadge.innerHTML = '<i class="fa-solid fa-thumbtack"></i>';
+                pinBadge.title = '已置顶';
+                div.appendChild(pinBadge);
+            }
+
+            // 处理图片
+            let img = version.images?.card || version.images?.avatar || version.image || '';
+            img = this.resolveImageUrl(img);
+            const hasImage = img && (img.startsWith('data:') || img.startsWith('http') || img.startsWith('blob:'));
+
+            // 重要程度
+            let displayLevel = version?.level || entry?.level || 5;
+            const isProtagonist = displayLevel === 1;
+            const isImportant = displayLevel === 2;
+            let badgeHtml = '';
+            if (status === 'future') {
+                badgeHtml = '<span class="role-badge" style="background: linear-gradient(135deg, #6b7280, #374151);">???</span>';
+            } else if (isProtagonist) {
+                badgeHtml = '<span class="role-badge badge-protagonist">主角</span>';
+            } else if (isImportant) {
+                badgeHtml = '<span class="role-badge badge-important">重要</span>';
+            }
+
+            div.innerHTML += `
+                <div class="relative aspect-[3/4] overflow-hidden bg-gray-100 shrink-0">
+                    ${hasImage ?
+                        `<img src="${img}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                            loading="lazy"
+                            style="${status === 'future' || status === 'missing' ? 'filter: grayscale(100%) brightness(0.6);' : ''}"
+                            onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-gray-300\\'><i class=\\'fa-solid fa-user text-4xl\\'></i></div>'">` :
+                        `<div class="w-full h-full flex items-center justify-center text-gray-300"><i class="fa-solid fa-user text-4xl"></i></div>`
+                    }
+                    ${badgeHtml}
+                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
+                        <div class="text-white font-bold text-sm truncate">${version.title}</div>
+                        <div class="text-white/80 text-xs font-mono truncate">${entry.code}</div>
+                    </div>
+                </div>
+                <div class="p-3 flex-1 flex flex-col justify-between min-h-[60px]">
+                    <p class="text-xs text-gray-500 line-clamp-2 ${status === 'future' ? 'italic text-gray-400' : ''}">${subtitleText}</p>
+                </div>`;
+            return div;
+        },
+
+        // ==================== 设定分类渲染 ====================
+        renderSettingsGrouped(container) {
+            if (this.isDataEmpty()) {
+                this.showEmptyState(container, '暂无设定数据', '管理员尚未添加设定，请检查存档文件。');
+                return;
+            }
+            const tpl = document.getElementById('tpl-list');
+            const clone = tpl.content.cloneNode(true);
+            const wrapper = clone.getElementById('masonry-container');
+            const countBadge = clone.getElementById('list-count');
+            const title = clone.getElementById('list-title');
+            if (title) title.textContent = '设定';
+            container.appendChild(clone);
+            wrapper.className = 'max-w-7xl mx-auto pb-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4';
+
+            const settings = this.data.entries.filter(e => e.type === 'non-character');
+            if (countBadge) countBadge.textContent = settings.length;
+
+            if (settings.length === 0) {
+                wrapper.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">暂无设定数据</div>';
+                return;
+            }
+
+            const groups = {};
+            settings.forEach(entry => {
+                let type = entry.settingType || 'world';
+                let groupKey = type;
+                let groupTitle = this.getSettingTypeLabel(type);
+                let groupIcon = this.getSettingTypeIcon(type);
+                if (type === 'custom' && entry.customSettingType?.trim()) {
+                    groupKey = `custom-${entry.customSettingType.trim()}`;
+                    groupTitle = entry.customSettingType.trim();
+                    groupIcon = 'fa-folder-open';
+                }
+                if (!groups[groupKey]) groups[groupKey] = { title: groupTitle, icon: groupIcon, type, items: [] };
+                groups[groupKey].items.push(entry);
+            });
+
+            const typeOrder = ['world', 'document', 'art', 'faction'];
+            const sortedKeys = Object.keys(groups).sort((a, b) => {
+                const aIsPreset = typeOrder.includes(groups[a].type);
+                const bIsPreset = typeOrder.includes(groups[b].type);
+                if (aIsPreset && !bIsPreset) return -1;
+                if (!aIsPreset && bIsPreset) return 1;
+                return a.localeCompare(b);
+            });
+
+            sortedKeys.forEach(key => {
+                const group = groups[key];
+                const visibleItems = group.items.filter(entry => {
+                    const version = this.getVisibleVersion(entry) || entry.versions[0];
+                    return this.getSettingTimeStatus(entry, version) !== 'future';
+                });
+                if (visibleItems.length === 0) return;
+
+                const section = document.createElement('div');
+                section.className = 'col-span-full mb-6';
+                section.innerHTML = `
+                    <div class="setting-category-header">
+                        <div class="setting-category-title"><i class="fa-solid ${group.icon} text-indigo-600 text-lg"></i><span class="text-lg font-bold text-gray-800">${group.title}</span><span class="setting-count-badge">${visibleItems.length}个</span></div>
+                        <button onclick="app.viewSettingCategory('${key}')" class="setting-more-btn">更多 <i class="fa-solid fa-chevron-right text-xs"></i></button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="setting-group-${key.replace(/[^a-zA-Z0-9]/g, '-')}"></div>`;
+                wrapper.appendChild(section);
+                const grid = section.querySelector(`#setting-group-${key.replace(/[^a-zA-Z0-9]/g, '-')}`);
+                visibleItems.forEach(entry => {
+                    let version = this.getVisibleVersion(entry) || entry.versions[0];
+                    if (!version) return;
+                    const card = this.createSettingCard(entry, version);
+                    grid.appendChild(card);
+                });
+            });
+        },
+
+        createSettingCard(entry, version) {
+            const div = document.createElement('div');
+            let img = version.images?.card || version.images?.avatar || '';
+            img = this.resolveImageUrl(img);
+            const hasImage = img && (img.startsWith('data:') || img.startsWith('http') || img.startsWith('blob:'));
+
+            div.dataset.hasImage = hasImage ? 'true' : 'false';
+            div.className = 'bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:shadow-md transition hover:border-indigo-300 flex flex-col relative group';
+            div.onclick = () => this.openEntry(entry.id);
+
+            let imageHtml = '';
+            if (hasImage) {
+                imageHtml = `<div class="aspect-[3/2] bg-gray-100 rounded-lg mb-3 overflow-hidden flex items-center justify-center shrink-0">
+                    <img src="${img}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image text-gray-300 text-2xl\\'></i>'">
+                </div>`;
+            }
+
+            div.innerHTML = `${imageHtml}
+                <div class="flex items-center justify-between min-h-[24px] ${!hasImage ? 'mb-1' : ''}">
+                    <h4 class="font-bold text-sm text-gray-800 truncate flex-1">${version.title}</h4>
+                    <span class="text-[10px] text-gray-400 font-mono ml-2">${entry.code}</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1 line-clamp-2">${version.subtitle || ''}</p>
+                ${!hasImage ? '<div class="flex-1"></div>' : ''}`;
+            return div;
+        },
+
+        viewSettingCategory(type) {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = '';
+            const settings = this.data.entries.filter(e => {
+                if (e.type !== 'non-character') return false;
+                if (type.startsWith('custom-') && e.settingType === 'custom') return e.customSettingType === type.replace('custom-', '');
+                return e.settingType === type;
+            });
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'h-full overflow-y-auto p-4 fade-in';
+            const header = document.createElement('div');
+            header.className = 'max-w-7xl mx-auto mb-6';
+            const groupTitle = type.startsWith('custom-') ? type.replace('custom-', '') : this.getSettingTypeLabel(type);
+            header.innerHTML = `
+                <button onclick="app.router('non-characters')" class="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"><i class="fa-solid fa-arrow-left"></i> 返回设定</button>
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2"><i class="fa-solid ${this.getSettingTypeIcon(type.replace('custom-', ''))} text-indigo-600"></i>${groupTitle}<span class="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">${settings.length}个</span></h2>`;
+            wrapper.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20';
+            if (settings.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">该目录下暂无设定词条</div>';
+            } else {
+                settings.forEach(entry => {
+                    const version = this.getVisibleVersion(entry) || entry.versions[0];
+                    if (version) grid.appendChild(this.createSettingCard(entry, version));
+                });
+            }
+            wrapper.appendChild(grid);
+            container.appendChild(wrapper);
+        },
+
+        // ==================== 详情页渲染（核心修复区域） ====================
+        renderDetail(container) {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            if (!entry) {
+                container.innerHTML = '<div class="p-4 text-red-600">你要找的东西好像消失惹~（条目不存在或已被删除）</div>';
+                return;
+            }
+
+            let version = entry.versions.find(v => v.vid === this.data.viewingVersionId) ||
+                          this.getVisibleVersion(entry) ||
+                          entry.versions[entry.versions.length - 1];
+            if (!version) {
+                container.innerHTML = '<div class="p-4 text-red-600">该条目没有内容版本</div>';
+                return;
+            }
+
+            const timeStatus = this.getVersionTimeStatus(entry, version);
+            const confirmKey = `${entry.id}_${version.vid}`;
+            if (timeStatus === 'future' && !this.confirmedFutureEntries.has(confirmKey)) {
+                this.showFutureConfirmDialog(entry, version, confirmKey);
+                return;
+            }
+
+            const tpl = document.getElementById('tpl-detail-view');
+            if (!tpl) return;
+            const clone = tpl.content.cloneNode(true);
+
+            const codeEl = clone.getElementById('detail-code');
+            const versionBadge = clone.getElementById('detail-version-badge');
+            const versionName = clone.getElementById('detail-version-name');
+            const contentEl = clone.getElementById('detail-content');
+
+            if (codeEl) codeEl.textContent = entry.code;
+            if (versionBadge && versionName && entry.versions.length > 1) {
+                versionBadge.classList.remove('hidden');
+                const vIndex = entry.versions.findIndex(v => v.vid === version.vid);
+                versionName.textContent = `${vIndex + 1}/${entry.versions.length}`;
+            }
+
+            // 处理图片
+            let cardImg = version.images?.card || version.images?.avatar || version.image;
+            cardImg = this.resolveImageUrl(cardImg);
+            const hasImage = cardImg && (cardImg.startsWith('data:') || cardImg.startsWith('http') || cardImg.startsWith('blob:'));
+
+            // 标题区域
+            let headerHtml = `<div class="flex-1 min-w-0">
+                <h1 class="text-3xl font-bold text-gray-900 mb-3 leading-tight">${this.escapeHtml(version.title)}</h1>
+                ${version.subtitle ? `<div class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4 leading-relaxed" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${this.parseInlineMarkdown(this.escapeHtml(version.subtitle))}</div>` : ''}
+            </div>`;
+
+            const imageHtml = hasImage ? `<div class="w-56 shrink-0">
+                <div class="aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 sticky top-24">
+                    <img src="${cardImg}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-gray-300\\'><i class=\\'fa-solid fa-image text-4xl\\'></i></div>'" alt="${this.escapeHtml(version.title)}">
+                </div>
+                ${(version.level <= 2 || entry.level <= 2) ? `<div class="text-center mt-3"><span class="inline-block px-4 py-1.5 ${(version.level === 1 || entry.level === 1) ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border rounded-full text-sm font-bold">${(version.level === 1 || entry.level === 1) ? '★ 主角' : '重要角色'}</span></div>` : ''}
+            </div>` : '';
+
+            // ========== 核心修复：正文内容渲染（统一索引解析） ==========
+            let contentBlocksHtml = '<div class="prose prose-sm max-w-none mt-6">';
+            if (version.blocks && version.blocks.length > 0) {
+                version.blocks.forEach(block => {
+                    if (block.type === 'h2') {
+                        contentBlocksHtml += `<h2 class="text-xl font-bold text-gray-800 mt-8 mb-4 border-b pb-2">${this.escapeHtml(block.text)}</h2>`;
+                    } else if (block.type === 'h3') {
+                        contentBlocksHtml += `<h3 class="text-lg font-bold text-gray-700 mt-6 mb-3">${this.escapeHtml(block.text)}</h3>`;
+                    } else if (block.type === 'p') {
+                        let text = block.text || '';
+                        // 【核心修复】使用统一的索引解析函数
+                        text = this.parseContentText(text);
+                        contentBlocksHtml += `<p class="text-gray-600 leading-relaxed mb-4" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${text}</p>`;
+                    }
+                });
+            } else {
+                contentBlocksHtml += '<div class="text-gray-400 italic">暂无详细内容</div>';
+            }
+            contentBlocksHtml += '</div>';
+
+            if (contentEl) {
+                contentEl.innerHTML = `<div class="flex flex-col md:flex-row gap-6 mb-2">${headerHtml}${imageHtml}</div>${contentBlocksHtml}`;
+            }
+
+            // 相关角色
+            const relatedSection = clone.getElementById('related-characters-section');
+            const relatedList = clone.getElementById('related-characters-list');
+            if (relatedSection && relatedList && version.relatedCharacters?.length > 0) {
+                relatedSection.classList.remove('hidden');
+                version.relatedCharacters.forEach(rc => {
+                    const charEntry = this.data.entries.find(e => e.id === rc.charId);
+                    if (!charEntry) return;
+                    const charVersion = this.getVisibleVersion(charEntry);
+                    const tag = document.createElement('span');
+                    tag.className = 'inline-flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-indigo-100 rounded-full text-xs cursor-pointer transition';
+                    tag.innerHTML = `<span class="font-medium">${this.escapeHtml(charVersion?.title || charEntry.code)}</span><span class="text-gray-400">.${this.escapeHtml(rc.relationName)}</span>`;
+                    tag.onclick = () => this.openEntry(charEntry.id);
+                    relatedList.appendChild(tag);
+                });
+            }
+
+            // 版本切换提示
+            const versionHint = clone.getElementById('version-switch-hint');
+            const versionList = clone.getElementById('version-switch-list');
+            if (versionHint && versionList && entry.versions.length > 1) {
+                const otherVersions = entry.versions.filter(v => v.vid !== version.vid);
+                if (otherVersions.length > 0) {
+                    versionHint.classList.remove('hidden');
+                    otherVersions.forEach(v => {
+                        const vStatus = this.getVersionTimeStatus(entry, v);
+                        const btn = document.createElement('button');
+                        btn.className = `text-xs px-3 py-1 rounded-full border transition ${vStatus === 'current' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`;
+                        btn.innerHTML = `${this.escapeHtml(v.title)} ${vStatus !== 'current' ? `<span class="text-[10px] opacity-70">(${vStatus === 'past' ? '过去' : '未来'})</span>` : ''}`;
+                        btn.onclick = () => {
+                            if (vStatus === 'future') {
+                                const vConfirmKey = `${entry.id}_${v.vid}`;
+                                this.data.viewingVersionId = v.vid;
+                                if (this.confirmedFutureEntries.has(vConfirmKey)) this.router('detail', false);
+                                else this.showFutureConfirmDialog(entry, v, vConfirmKey);
+                            } else {
+                                this.data.viewingVersionId = v.vid;
+                                this.router('detail', false);
+                            }
+                        };
+                        versionList.appendChild(btn);
+                    });
+                }
+            }
+
+            container.appendChild(clone);
+        },
+
+        // ==================== 【核心修复】统一索引解析 ====================
+        parseContentText(text) {
+            if (!text) return '';
+            let html = this.escapeHtml(text);
+
+            // 1. 处理词条链接 - 新格式 [[entryId|versionId:displayText]]
+            // 【修复】使用更精确的正则，避免末尾字符丢失
+            html = html.replace(/\[\[([^\]|]+)\|([^:\]]+):([^\]]+)\]\]/g, (match, entryId, versionId, displayText) => {
+                const cleanEntryId = entryId.trim();
+                const cleanVersionId = versionId.trim();
+                const cleanDisplayText = displayText.trim();
+                const entry = this.findEntry(cleanEntryId);
+                if (entry && entry.versions) {
+                    const version = entry.versions.find(v => v.vid === cleanVersionId);
+                    const actualVid = version ? version.vid : (entry.versions[0]?.vid || '');
+                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${actualVid}')">${cleanDisplayText}</a>`;
+                }
+                return `<span class="text-red-400" title="词条未找到">[[${cleanDisplayText}]]</span>`;
+            });
+
+            // 2. 处理词条链接 - 旧格式 [[entryIdOrCode:displayText]]
+            html = html.replace(/\[\[([^\]|]+):([^\]]+)\]\]/g, (match, entryIdOrCode, displayText) => {
+                const cleanId = entryIdOrCode.trim();
+                const cleanDisplayText = displayText.trim();
+                const entry = this.findEntry(cleanId);
+                if (entry && entry.versions && entry.versions.length > 0) {
+                    const firstVersion = entry.versions[0];
+                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${firstVersion.vid}')">${cleanDisplayText}</a>`;
+                }
+                return `<span class="text-red-400" title="词条未找到">[[${cleanDisplayText}]]</span>`;
+            });
+
+            // 3. 处理旧格式 [[title]]（通过标题查找）
+            html = html.replace(/\[\[([^\]|]+)\]\]/g, (match, title) => {
+                // 跳过已经处理过的链接（已被上面的正则替换）
+                if (match.includes('|') || match.includes(':')) return match;
+                const cleanTitle = title.trim();
+                const entry = this.data.entries.find(e => {
+                    const v = this.getVisibleVersion(e);
+                    return v && v.title === cleanTitle;
+                });
+                if (entry && entry.versions.length > 0) {
+                    const firstVersion = entry.versions[0];
+                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${firstVersion.vid}')">${cleanTitle}</a>`;
+                }
+                return `<span class="text-gray-400">[[${cleanTitle}]]</span>`;
+            });
+
+            // 4. 处理角色引用 @名字[代码]
+            html = html.replace(/@([^\[]+)\[([^\]]+)\]/g, (match, name, code) => {
+                const cleanName = name.trim();
+                const cleanCode = code.replace(/\\/g, '').trim();
+                const entry = this.data.entries.find(e => e.code === cleanCode);
+                if (entry) {
+                    return `<span class="synopsis-entry-ref" onclick="app.openEntry('${entry.id}')"><i class="fa-solid fa-user text-xs mr-1"></i>${cleanName}</span>`;
+                }
+                return `<span class="synopsis-entry-ref"><i class="fa-solid fa-user text-xs mr-1"></i>${cleanName}</span>`;
+            });
+
+            // 5. 处理剧情引用 {{synopsis:chapterId:title}}
+            html = html.replace(/\{\{synopsis:([^:]+):([^}]+)\}\}/g, (match, chapterId, title) => {
+                const cleanChapterId = chapterId.trim();
+                const cleanTitle = title.trim();
+                const chapter = this.data.synopsis.find(s => s.id === cleanChapterId);
+                if (chapter) {
+                    return `<span class="synopsis-entry-ref" data-chapter-id="${cleanChapterId}" onmouseenter="app.handleSynopsisRefHover(this)" onmouseleave="app.handleSynopsisRefLeave(this)" onclick="app.handleSynopsisRefClick(this)"><i class="fa-solid fa-film text-xs mr-1"></i>${cleanTitle}</span>`;
+                }
+                return match;
+            });
+
+            // 6. 处理 Markdown 样式标记
+            html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+            html = html.replace(/\*(.+?)\*/g, '<i>$1</i>');
+            html = html.replace(/__(.+?)__/g, '<u>$1</u>');
+            html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+            // 7. 换行符转为 <br>（EscapeHTML已经转义了换行符，需要恢复）
+            html = html.replace(/\n/g, '<br>');
+
+            return html;
+        },
+
+        // 行内Markdown解析（用于subtitle等短文本）
+        parseInlineMarkdown(text) {
+            if (!text) return '';
+            let html = this.escapeHtml(text);
+            html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+            html = html.replace(/\*(.+?)\*/g, '<i>$1</i>');
+            html = html.replace(/__(.+?)__/g, '<u>$1</u>');
+            html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+            html = html.replace(/\n/g, '<br>');
+            return html;
+        },
+
+        // ==================== 图片URL解析 ====================
+        resolveImageUrl(imgRef) {
+            if (!imgRef) return '';
+            // dataUrl 直接返回
+            if (imgRef.startsWith('data:')) return imgRef;
+            // blob URL 直接返回
+            if (imgRef.startsWith('blob:')) return imgRef;
+            // http URL 直接返回
+            if (imgRef.startsWith('http')) return imgRef;
+            // {{IMG:filename}} 格式 → 转换为相对路径
+            if (imgRef.startsWith('{{IMG:')) {
+                const match = imgRef.match(/\{\{IMG:(.+?)\}\}/);
+                if (match && match[1]) {
+                    return `./data/wiki-images/${match[1]}`;
+                }
+            }
+            return imgRef;
+        },
+
+        // ==================== 辅助函数 ====================
+        findEntry(idOrCode) {
+            if (!idOrCode) return null;
+            const cleanId = String(idOrCode).trim();
+            let entry = this.data.entries.find(e => String(e.id).trim() === cleanId);
+            if (!entry) entry = this.data.entries.find(e => e.code === cleanId);
+            return entry;
+        },
+
+        escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        },
+
+        stripHtml(html) {
+            if (!html) return '';
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        },
+
+        formatChapterNum(num) {
+            if (num === undefined || num === null) return '';
+            return String(num);
+        },
+
+        getChapterOrder(chapterId) {
+            if (!chapterId) return -1;
+            const chapter = this.data.chapters.find(c => c.id === chapterId);
+            return chapter ? chapter.order : -1;
+        },
+
+        getVisibleVersion(entry) {
+            if (!entry || !entry.versions || entry.versions.length === 0) return null;
+            if (this.data.currentTimeline === 'latest') return entry.versions[entry.versions.length - 1];
+            const currentCh = this.data.chapters.find(c => c.id === this.data.currentTimeline);
+            if (!currentCh) return entry.versions[entry.versions.length - 1];
+
+            // 检查是否有置顶版本
+            if (entry.pinnedVersions && entry.pinnedVersions[this.data.currentTimeline]) {
+                const pinnedVid = entry.pinnedVersions[this.data.currentTimeline];
+                const pinned = entry.versions.find(v => v.vid === pinnedVid);
+                if (pinned) return pinned;
+            }
+
+            // 查找当前时间轴下最新版本
+            let activeVersion = null;
+            for (let i = entry.versions.length - 1; i >= 0; i--) {
+                const v = entry.versions[i];
+                const fromOrder = this.getChapterOrder(v.chapterFrom);
+                const toOrder = v.chapterTo ? this.getChapterOrder(v.chapterTo) : Infinity;
+                if (currentCh.order >= fromOrder && currentCh.order <= toOrder) {
+                    activeVersion = v;
+                    break;
+                }
+            }
+
+            // 如果没找到活跃版本，检查是否有默认置顶版本（失踪区间）
+            if (!activeVersion && entry.missingIntervalVersion) {
+                return entry.versions.find(v => v.vid === entry.missingIntervalVersion) || entry.versions[entry.versions.length - 1];
+            }
+            if (!activeVersion && entry.defaultPinnedVersion) {
+                return entry.versions.find(v => v.vid === entry.defaultPinnedVersion) || entry.versions[entry.versions.length - 1];
+            }
+            return activeVersion || entry.versions[entry.versions.length - 1];
+        },
+
+        getVersionTimeStatus(entry, version) {
+            if (this.data.currentTimeline === 'latest') return 'current';
+            const currentCh = this.data.chapters.find(c => c.id === this.data.currentTimeline);
+            if (!currentCh) return 'current';
+            const fromCh = version.chapterFrom ? this.data.chapters.find(c => c.id === version.chapterFrom) : null;
+            const toCh = version.chapterTo ? this.data.chapters.find(c => c.id === version.chapterTo) : null;
+            const fromOrder = fromCh ? fromCh.order : -1;
+            const toOrder = toCh ? toCh.order : Infinity;
+            if (currentCh.order >= fromOrder && currentCh.order <= toOrder) return 'current';
+            if (currentCh.order > toOrder) return 'past';
+            return 'future';
+        },
+
+        getCharacterDisplayStatus(entry) {
+            if (!entry || entry.type !== 'character') return 'normal';
+            const currentVersion = this.getVisibleVersion(entry);
+            if (!currentVersion) return 'missing';
+            const timeStatus = this.getVersionTimeStatus(entry, currentVersion);
+            if (timeStatus === 'future') return 'future';
+            if (timeStatus === 'current' || timeStatus === 'past') {
+                const isMissing = this.checkIfMissing(entry);
+                if (isMissing) return 'missing';
+            }
+            const hasParallel = this.checkHasParallelVersions(entry);
+            if (hasParallel) return 'parallel';
+            return 'normal';
+        },
+
+        checkIfMissing(entry) {
+            if (!entry || !entry.versions || entry.versions.length === 0) return false;
+            const currentCh = this.data.currentTimeline === 'latest' ? { order: Infinity } : this.data.chapters.find(c => c.id === this.data.currentTimeline);
+            if (!currentCh || currentCh.order === Infinity) return false;
+            const currentVersion = this.getVisibleVersion(entry);
+            if (!currentVersion) return false;
+            if (!currentVersion.chapterTo) return false;
+            const currentToOrder = this.getChapterOrder(currentVersion.chapterTo);
+            if (currentCh.order < currentToOrder) return false;
+            const hasFutureVersion = entry.versions.some(v => {
+                if (v.vid === currentVersion.vid) return false;
+                const vFromOrder = this.getChapterOrder(v.chapterFrom);
+                return vFromOrder > currentToOrder;
+            });
+            if (hasFutureVersion) return false;
+            return true;
+        },
+
+        isCharacterPinned(entry) {
+            if (!entry || !entry.pinned) return false;
+            if (!entry.pinStartChapter && !entry.pinEndChapter) return true;
+            const currentCh = this.data.currentTimeline === 'latest' ? null : this.data.chapters.find(c => c.id === this.data.currentTimeline);
+            if (!currentCh) return true;
+            const startOrder = entry.pinStartChapter ? this.getChapterOrder(entry.pinStartChapter) : -1;
+            const endOrder = entry.pinEndChapter ? this.getChapterOrder(entry.pinEndChapter) : Infinity;
+            return currentCh.order >= startOrder && currentCh.order <= endOrder;
+        },
+
+        checkHasParallelVersions(entry) {
+            if (!entry || !entry.versions || entry.versions.length < 2) return false;
+            if (this.data.currentTimeline === 'latest') return false;
+            const currentCh = this.data.chapters.find(c => c.id === this.data.currentTimeline);
+            if (!currentCh) return false;
+            let activeCount = 0;
+            for (const v of entry.versions) {
+                const fromOrder = this.getChapterOrder(v.chapterFrom);
+                const toOrder = this.getChapterOrder(v.chapterTo);
+                if (currentCh.order >= fromOrder && currentCh.order <= toOrder) {
+                    activeCount++;
+                    if (activeCount >= 2) return true;
+                }
+            }
+            return false;
+        },
+
+        getSortLevel(entry, status) {
+            if (status === 'future') return entry.versions?.[0]?.level || 5;
+            const version = this.getVisibleVersion(entry);
+            return version?.level || entry?.level || 5;
+        },
+
+        getSettingTimeStatus(entry, version) {
+            if (!version) return 'current';
+            if (this.data.currentTimeline === 'latest') return 'current';
+            const currentCh = this.data.chapters.find(c => c.id === this.data.currentTimeline);
+            if (!currentCh) return 'current';
+            const fromCh = version.chapterFrom ? this.data.chapters.find(c => c.id === version.chapterFrom) : null;
+            const toCh = version.chapterTo ? this.data.chapters.find(c => c.id === version.chapterTo) : null;
+            const fromOrder = fromCh ? fromCh.order : -1;
+            const toOrder = toCh ? toCh.order : Infinity;
+            if (currentCh.order >= fromOrder && currentCh.order <= toOrder) return 'current';
+            if (currentCh.order > toOrder) return 'past';
+            return 'future';
+        },
+
+        getSettingTypeLabel(type) {
+            const labels = { 'world': '世界设定', 'document': '特殊文献', 'art': '绘画/图片', 'faction': '阵营', 'custom': '自定义' };
+            return labels[type] || '其他';
+        },
+
+        getSettingTypeIcon(type) {
+            const icons = { 'world': 'fa-globe', 'document': 'fa-scroll', 'art': 'fa-palette', 'faction': 'fa-shield-halved', 'custom': 'fa-folder' };
+            return icons[type] || 'fa-folder';
+        },
+
+        getMissingInfo(entry) {
+            const currentVersion = this.getVisibleVersion(entry);
+            if (!currentVersion) return null;
+            const futureVersions = entry.versions.filter(v => {
+                const vFromOrder = this.getChapterOrder(v.chapterFrom);
+                const currentFromOrder = this.getChapterOrder(currentVersion.chapterFrom);
+                return vFromOrder > currentFromOrder;
+            }).sort((a, b) => this.getChapterOrder(a.chapterFrom) - this.getChapterOrder(b.chapterFrom));
+            return { isMissing: true, latestVersion: futureVersions.length > 0 ? futureVersions[futureVersions.length - 1] : currentVersion, currentVersion, missingSince: currentVersion.chapterTo ? this.data.chapters.find(c => c.id === currentVersion.chapterTo) : null };
+        },
+
+        // ==================== 弹窗 ====================
+        showFutureConfirmDialog(entry, version, confirmKey) {
+            if (!confirmKey) confirmKey = `${entry.id}_${version.vid}`;
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 fade-in';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-clock-rotate-left text-amber-600 text-2xl"></i></div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">未来内容警告</h3>
+                        <p class="text-gray-600 text-sm">你正在查看<span class="font-bold text-indigo-600">${this.escapeHtml(version.title)}</span>的<span class="text-amber-600 font-bold">未来形态</span>，可能包含剧透内容。</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button id="future-cancel" class="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">返回当前</button>
+                        <button id="future-confirm" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium shadow-lg shadow-indigo-200">仍要查看</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#future-cancel').onclick = () => overlay.remove();
+            overlay.querySelector('#future-confirm').onclick = () => { overlay.remove(); this.confirmedFutureEntries.add(confirmKey); this.openEntry(entry.id); };
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        },
+
+        showMissingConfirmDialog(entry, missingInfo) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 fade-in';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-question text-gray-600 text-2xl"></i></div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">角色失踪警告</h3>
+                        <p class="text-gray-600 text-sm">${this.escapeHtml(missingInfo.latestVersion.title)}目前<span class="font-bold text-gray-800">貌似失踪了</span>......<br>是否仍然查看其最新版本的词条内容？</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button id="missing-cancel" class="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">返回列表</button>
+                        <button id="missing-confirm" class="flex-1 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium shadow-lg">仍要查看</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#missing-cancel').onclick = () => overlay.remove();
+            overlay.querySelector('#missing-confirm').onclick = () => { overlay.remove(); this.openEntry(entry.id); };
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        },
+
+        // ==================== 搜索 ====================
+        handleSearchInput(value) {
+            const dropdown = document.getElementById('search-dropdown');
+            if (!value.trim()) { dropdown.classList.add('hidden'); return; }
+            const results = this.data.entries.filter(e => {
+                const v = this.getVisibleVersion(e);
+                const title = v ? v.title : '';
+                return e.code.toLowerCase().includes(value.toLowerCase()) || title.toLowerCase().includes(value.toLowerCase());
+            }).slice(0, 10);
+            if (results.length === 0) { dropdown.innerHTML = '<div class="p-4 text-sm text-gray-500 text-center">无结果</div>'; dropdown.classList.remove('hidden'); return; }
+            dropdown.innerHTML = results.map(e => {
+                const v = this.getVisibleVersion(e);
+                const status = this.getCharacterDisplayStatus(e);
+                const statusTag = status === 'future' ? '<span class="search-tag future">未来</span>' : status === 'missing' ? '<span class="search-tag past">失踪</span>' : '<span class="search-tag current">当前</span>';
+                return `<div class="search-item" onclick="app.openEntry('${e.id}'); app.hideSearchDropdown();">
+                    <span class="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">${e.code}</span>
+                    <span class="text-sm text-gray-700">${this.escapeHtml(v?.title || '')}</span>
+                    ${statusTag}
+                </div>`;
+            }).join('');
+            dropdown.classList.remove('hidden');
+        },
+
+        showSearchDropdown() { if (document.getElementById('global-search').value.trim()) document.getElementById('search-dropdown').classList.remove('hidden'); },
+        hideSearchDropdown() { document.getElementById('search-dropdown').classList.add('hidden'); },
+
+        // ==================== 导航 ====================
+        openEntry(entryId, versionId) {
+            const entry = this.data.entries.find(e => e.id === entryId);
+            if (!entry) return;
+            this.data.editingId = entryId;
+            if (versionId && entry.versions.some(v => v.vid === versionId)) {
+                this.data.viewingVersionId = versionId;
+            } else {
+                this.data.viewingVersionId = null;
+            }
+            this.addToHistory(entry);
+            this.router('detail');
+        },
+
+        openEntryWithVersion(entryId, versionId) {
+            this.openEntry(entryId, versionId);
+        },
+
+        goBack() {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            if (entry && entry.type === 'non-character') this.router('non-characters');
+            else this.router('characters');
+        },
+
+        addToHistory(entry) {
+            if (!this.data.history) this.data.history = [];
+            this.data.history = this.data.history.filter(h => h.id !== entry.id);
+            this.data.history.push({ id: entry.id, timestamp: Date.now() });
+            if (this.data.history.length > 50) this.data.history = this.data.history.slice(-50);
+        },
+
+        // ==================== 时间轴 ====================
+        setTimeline(chapterId) {
+            this.data.currentTimeline = chapterId;
+            const toast = document.getElementById('timeline-switch-toast');
+            const toastText = document.getElementById('timeline-switch-text');
+            if (chapterId === 'latest') {
+                if (toastText) toastText.textContent = '已切换到最新进度';
+            } else {
+                const ch = this.data.chapters.find(c => c.id === chapterId);
+                if (toastText && ch) toastText.textContent = `已切换到 ${this.formatChapterNum(ch.num)} ${ch.title || ''}`;
+            }
+            if (toast) { toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); }
+            // 刷新当前视图
+            const currentView = this.data.currentView;
+            if (currentView === 'characters' || currentView === 'non-characters' || currentView === 'detail' || currentView === 'graph') {
+                this.router(currentView, true);
+            }
+        },
+
+        // ==================== 公告 ====================
+        viewAnnouncement() {
+            const ann = this.data.announcements?.find(a => a.isActive);
+            if (!ann) { this.showToast('当前没有生效的公告', 'info'); return; }
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+                    <div class="p-4 border-b bg-gradient-to-r from-orange-50 to-amber-50 flex justify-between items-center">
+                        <div><h3 class="font-bold text-lg text-gray-800">${this.escapeHtml(ann.title || '公告')}</h3><p class="text-xs text-gray-500">${this.escapeHtml(ann.author || '匿名')} · ${ann.date || ''}</p></div>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    <div class="p-6 overflow-y-auto prose prose-sm max-w-none">${ann.content || ''}</div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        },
+
+        // ==================== Toast ====================
+        showToast(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-20 left-1/2 transform -translate-x-1/2 z-[99999] px-4 py-2 rounded-lg shadow-lg text-white text-sm flex items-center gap-2 fade-in ${type === 'success' ? 'bg-green-600' : type === 'warning' ? 'bg-amber-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'}`;
+            const icons = { info: 'fa-circle-info', success: 'fa-check-circle', warning: 'fa-triangle-exclamation', error: 'fa-circle-exclamation' };
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${message}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'all 0.3s ease'; setTimeout(() => toast.remove(), 300); }, duration);
+        },
+
+        // ==================== 关系图谱 ====================
+        renderGraph(container) {
+            if (this.isDataEmpty()) {
+                this.showEmptyState(container, '暂无角色数据', '管理员尚未添加角色，关系图无法显示。');
+                return;
+            }
+            const tpl = document.getElementById('tpl-graph');
+            if (!tpl) return;
+            const clone = tpl.content.cloneNode(true);
+            container.appendChild(clone);
+            this.initDraggablePanel();
+            setTimeout(() => this.renderGraphNodes(), 50);
+        },
+
+        initDraggablePanel() {
+            const panel = document.getElementById('graph-info-panel');
+            if (!panel) return;
+            const handle = panel.querySelector('.draggable-handle');
+            if (!handle) return;
+            let isDragging = false, startX, startY, initialX, initialY;
+            handle.addEventListener('mousedown', (e) => { isDragging = true; panel.classList.add('dragging'); startX = e.clientX; startY = e.clientY; const rect = panel.getBoundingClientRect(); initialX = rect.left; initialY = rect.top; e.preventDefault(); });
+            document.addEventListener('mousemove', (e) => { if (!isDragging) return; const dx = e.clientX - startX; const dy = e.clientY - startY; panel.style.left = `${initialX + dx}px`; panel.style.top = `${initialY + dy}px`; panel.style.right = 'auto'; });
+            document.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; panel.classList.remove('dragging'); } });
+        },
+
+        togglePanelCollapse() {
+            const content = document.getElementById('panel-content');
+            const icon = document.querySelector('#graph-info-panel button i');
+            if (!content || !icon) return;
+            if (content.classList.contains('hidden')) { content.classList.remove('hidden'); icon.className = 'fa-solid fa-minus'; }
+            else { content.classList.add('hidden'); icon.className = 'fa-solid fa-plus'; }
+        },
+
+        renderGraphNodes() {
+            const container = document.getElementById('graph-nodes');
+            const svg = document.getElementById('graph-svg');
+            if (!container || !svg) return;
+            container.innerHTML = '';
+            svg.innerHTML = '';
+            let chars = this.data.entries.filter(e => e.type === 'character');
+            if (this.data.currentTimeline !== 'latest') chars = chars.filter(e => this.getVisibleVersion(e) !== null);
+            if (chars.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 mt-20">暂无角色数据</div>'; return; }
+
+            const hexRadius = 80, hexWidth = hexRadius * Math.sqrt(3), hexHeight = hexRadius * 2;
+            const containerRect = container.getBoundingClientRect();
+            const centerX = containerRect.width / 2, centerY = containerRect.height / 2;
+            const positions = this.calculateHoneycombPositions(chars.length, hexWidth, hexHeight, centerX, centerY);
+
+            chars.forEach((char, idx) => {
+                const version = this.getVisibleVersion(char);
+                if (!version) return;
+                const pos = positions[idx];
+                const node = document.createElement('div');
+                node.className = 'hexagon-wrapper absolute';
+                node.style.left = `${pos.x - 70}px`; node.style.top = `${pos.y - 80}px`;
+                node.style.width = '140px'; node.style.height = '160px';
+                node.dataset.charId = char.id;
+
+                let avatarImg = version.images?.avatar || version.image;
+                avatarImg = this.resolveImageUrl(avatarImg);
+
+                node.innerHTML = `
+                    <div class="hexagon lvl-${version.level || char.level || 3}">
+                        <div class="hexagon-content">
+                            <div class="w-16 h-16 rounded-full bg-gray-200 overflow-hidden mb-2 border-2 border-white shadow">
+                                ${avatarImg ? `<img src="${avatarImg}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'w-full h-full bg-indigo-100 flex items-center justify-center text-indigo-500 text-xs font-bold\\'>${char.code}</div>'">` : `<div class="w-full h-full bg-indigo-100 flex items-center justify-center text-indigo-500 text-xs font-bold">${char.code}</div>`}
+                            </div>
+                            <div class="text-xs font-bold text-center truncate w-full px-2">${this.escapeHtml(version.title)}</div>
+                            ${(version.level === 1 || char.level === 1) ? '<div class="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-white text-[10px] shadow"><i class="fa-solid fa-star"></i></div>' : ''}
+                        </div>
+                    </div>`;
+
+                let clickTimer = null, clickCount = 0;
+                node.onclick = (e) => {
+                    e.stopPropagation();
+                    clickCount++;
+                    if (clickCount === 1) { this.selectGraphNode(char); clickTimer = setTimeout(() => { clickCount = 0; }, 300); }
+                    else if (clickCount === 2) { clearTimeout(clickTimer); clickCount = 0; this.openEntry(char.id); }
+                };
+                container.appendChild(node);
+            });
+            this.drawRelationLines(chars, positions);
+            const graphContainer = document.getElementById('graph-container');
+            if (graphContainer) graphContainer.onclick = (e) => { if (e.target.id === 'graph-container' || e.target.id === 'graph-svg') this.resetGraphSelection(); };
+        },
+
+        calculateHoneycombPositions(count, hexW, hexH, centerX, centerY) {
+            const positions = [{ x: centerX, y: centerY }];
+            if (count <= 1) return positions;
+            let ring = 1, remaining = count - 1;
+            while (remaining > 0) {
+                const ringCount = ring * 6;
+                for (let i = 0; i < Math.min(ringCount, remaining); i++) {
+                    const angle = (i / ringCount) * Math.PI * 2 - Math.PI / 2;
+                    const radius = ring * hexW;
+                    positions.push({ x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius * 0.866 });
+                }
+                remaining -= ringCount; ring++;
+            }
+            return positions;
+        },
+
+        drawRelationLines(chars, positions) {
+            const svg = document.getElementById('graph-svg');
+            if (!svg) return;
+            chars.forEach((char, idx) => {
+                const version = this.getVisibleVersion(char);
+                if (!version || !version.relatedCharacters) return;
+                const startPos = positions[idx];
+                version.relatedCharacters.forEach(rc => {
+                    const targetIdx = chars.findIndex(c => c.id === rc.charId);
+                    if (targetIdx === -1) return;
+                    const endPos = positions[targetIdx];
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', startPos.x); line.setAttribute('y1', startPos.y);
+                    line.setAttribute('x2', endPos.x); line.setAttribute('y2', endPos.y);
+                    line.setAttribute('stroke', '#cbd5e1'); line.setAttribute('stroke-width', '2'); line.setAttribute('stroke-dasharray', '5,5');
+                    svg.appendChild(line);
+                });
+            });
+        },
+
+        selectGraphNode(char) {
+            const version = this.getVisibleVersion(char);
+            if (!version) return;
+            const infoDiv = document.getElementById('selected-character-info');
+            const emptyHint = document.getElementById('graph-empty-hint');
+            if (emptyHint) emptyHint.classList.add('hidden');
+            if (infoDiv) infoDiv.classList.remove('hidden');
+            const nameEl = document.getElementById('selected-char-name');
+            if (nameEl) nameEl.innerHTML = `<div class="flex items-center justify-between gap-2"><span class="truncate cursor-pointer hover:text-indigo-600 transition" onclick="app.openEntry('${char.id}')">${this.escapeHtml(version.title)}</span><button onclick="app.openEntry('${char.id}')" class="shrink-0 text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 transition whitespace-nowrap">查看词条</button></div>`;
+            const relationEl = document.getElementById('selected-char-relation');
+            if (relationEl) {
+                let relationText = '';
+                if (version.relatedCharacters && version.relatedCharacters.length > 0) {
+                    relationText = version.relatedCharacters.map(rc => {
+                        const relatedChar = this.data.entries.find(e => e.id === rc.charId);
+                        if (!relatedChar) return '';
+                        const relatedVersion = this.getVisibleVersion(relatedChar);
+                        return `与 ${this.escapeHtml(relatedVersion ? relatedVersion.title : relatedChar.code)} 是${this.escapeHtml(rc.relationName)}`;
+                    }).filter(Boolean).join('；');
+                }
+                relationEl.textContent = relationText || '暂无关系';
+            }
+            document.querySelectorAll('.hexagon-wrapper').forEach(node => {
+                if (node.dataset.charId === char.id) { node.style.opacity = '1'; node.style.transform = 'scale(1.1)'; node.style.zIndex = '10'; node.style.filter = 'drop-shadow(0 8px 16px rgba(0,0,0,0.2))'; }
+                else { node.style.opacity = '0.3'; node.style.transform = 'scale(1)'; node.style.zIndex = '1'; node.style.filter = 'none'; }
+            });
+            const related = (version.relatedCharacters || []).map(rc => {
+                const entry = this.data.entries.find(e => e.id === rc.charId);
+                return entry ? { entry, level: entry.level || 5 } : null;
+            }).filter(Boolean);
+            related.forEach(r => {
+                const node = document.querySelector(`.hexagon-wrapper[data-char-id="${r.entry.id}"]`);
+                if (node) { node.style.opacity = '1'; node.style.transform = 'scale(1.05)'; }
+            });
+        },
+
+        resetGraphSelection() {
+            document.querySelectorAll('.hexagon-wrapper').forEach(node => { node.style.opacity = '1'; node.style.transform = 'scale(1)'; node.style.zIndex = '1'; node.style.filter = 'none'; });
+            const infoDiv = document.getElementById('selected-character-info');
+            const emptyHint = document.getElementById('graph-empty-hint');
+            if (infoDiv) infoDiv.classList.add('hidden');
+            if (emptyHint) emptyHint.classList.remove('hidden');
+        },
+
+        zoomIn() { this.data.graphState.scale = Math.min(this.data.graphState.scale * 1.2, 3); this.applyGraphTransform(); },
+        zoomOut() { this.data.graphState.scale = Math.max(this.data.graphState.scale / 1.2, 0.3); this.applyGraphTransform(); },
+        resetGraphView() { this.data.graphState.scale = 1; this.data.graphState.translateX = 0; this.data.graphState.translateY = 0; this.applyGraphTransform(); },
+        applyGraphTransform() {
+            const nodes = document.getElementById('graph-nodes');
+            const svg = document.getElementById('graph-svg');
+            const transform = `translate(${this.data.graphState.translateX}px, ${this.data.graphState.translateY}px) scale(${this.data.graphState.scale})`;
+            if (nodes) nodes.style.transform = transform;
+            if (svg) svg.style.transform = transform;
+        },
+
+        // ==================== 剧情梗概浏览 ====================
+        renderSynopsisView(container) {
+            if (!this.data.synopsis || this.data.synopsis.length === 0) {
+                this.showEmptyState(container, '暂无剧情梗概', '管理员尚未添加剧情梗概，请检查存档文件。');
+                return;
+            }
+            const tpl = document.getElementById('tpl-synopsis');
+            if (!tpl) return;
+            const clone = tpl.content.cloneNode(true);
+            container.appendChild(clone);
+            const list = document.getElementById('synopsis-view-list');
+            if (list) this.renderSynopsisViewList(list);
+            // 激活第一个
+            setTimeout(() => { if (this.data.synopsis.length > 0) this.setSynopsisActiveIndex(0); }, 100);
+        },
+
+        renderSynopsisViewList(container) {
+            container.innerHTML = '';
+            this.data.synopsis.forEach((chapter, idx) => {
+                const item = document.createElement('div');
+                item.className = 'synopsis-view-item';
+                item.id = `synopsis-item-${idx}`;
+
+                let imgHtml = '';
+                if (chapter.image) {
+                    const imgUrl = this.resolveImageUrl(chapter.image);
+                    imgHtml = `<img src="${imgUrl}" class="synopsis-view-image" onerror="this.style.display='none'" alt="">`;
+                }
+
+                // 解析内容中的索引
+                let contentHtml = this.parseContentText(chapter.content || '');
+
+                item.innerHTML = `
+                    <div class="synopsis-view-header">
+                        <span class="synopsis-view-num">${this.escapeHtml(this.formatChapterNum(chapter.num))}</span>
+                        <span class="synopsis-view-title">${this.escapeHtml(chapter.title || '')}</span>
+                    </div>
+                    ${imgHtml}
+                    <div class="synopsis-view-content line-clamp" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;">${contentHtml}</div>`;
+                container.appendChild(item);
+            });
+        },
+
+        setSynopsisActiveIndex(idx) {
+            if (!this.data.synopsis || idx < 0 || idx >= this.data.synopsis.length) return;
+            this.data.synopsisViewIndex = idx;
+            document.querySelectorAll('.synopsis-view-item').forEach((item, i) => {
+                if (i === idx) {
+                    item.classList.add('active'); item.classList.remove('inactive');
+                    const content = item.querySelector('.synopsis-view-content');
+                    if (content) { content.classList.remove('line-clamp'); content.style.display = 'block'; }
+                    const img = item.querySelector('.synopsis-view-image');
+                    if (img) { img.style.maxHeight = '300px'; img.style.opacity = '1'; }
+                } else {
+                    item.classList.remove('active'); item.classList.add('inactive');
+                    const content = item.querySelector('.synopsis-view-content');
+                    if (content) { content.classList.add('line-clamp'); content.style.display = '-webkit-box'; content.style.webkitBoxOrient = 'vertical'; content.style.webkitLineClamp = '3'; }
+                    const img = item.querySelector('.synopsis-view-image');
+                    if (img) { img.style.maxHeight = '200px'; img.style.opacity = '0.5'; }
+                }
+            });
+            this.scrollToSynopsisItem(idx);
+            this.updateSwitchTimeButton();
+        },
+
+        scrollToSynopsisItem(idx) {
+            const item = document.getElementById(`synopsis-item-${idx}`);
+            if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        },
+
+        navigateSynopsis(direction) {
+            const newIdx = this.data.synopsisViewIndex + direction;
+            if (newIdx >= 0 && newIdx < this.data.synopsis.length) this.setSynopsisActiveIndex(newIdx);
+        },
+
+        updateSwitchTimeButton() {
+            const btn = document.getElementById('synopsis-switch-time-btn');
+            if (!btn) return;
+            const chapter = this.data.synopsis[this.data.synopsisViewIndex];
+            if (!chapter) { btn.classList.add('hidden'); return; }
+            const chapterId = chapter.chapterId || chapter.id;
+            const isDifferentTime = this.data.currentTimeline !== chapterId;
+            btn.classList.toggle('hidden', !isDifferentTime);
+            if (isDifferentTime) { requestAnimationFrame(() => { btn.style.setProperty('top', 'auto', 'important'); btn.style.setProperty('bottom', '80px', 'important'); btn.style.setProperty('right', '20px', 'important'); btn.style.setProperty('position', 'fixed', 'important'); }); }
+        },
+
+        switchToSynopsisTime() {
+            const chapter = this.data.synopsis[this.data.synopsisViewIndex];
+            if (!chapter) return;
+            this.setTimeline(chapter.chapterId);
+            this.updateSwitchTimeButton();
+        },
+
+        // ==================== 剧情引用悬浮窗 ====================
+        showSynopsisTooltip(chapterId, triggerElement) {
+            const chapter = this.data.synopsis.find(s => s.id === chapterId);
+            if (!chapter) return;
+            this.closeSynopsisTooltip();
+            const tpl = document.getElementById('tpl-synopsis-tooltip');
+            if (!tpl) return;
+            const clone = tpl.content.cloneNode(true);
+            document.body.appendChild(clone);
+            const numEl = document.getElementById('tooltip-chapter-num');
+            const titleEl = document.getElementById('tooltip-chapter-title');
+            const imgEl = document.getElementById('tooltip-chapter-image');
+            const contentEl = document.getElementById('tooltip-chapter-content');
+            const tooltip = document.getElementById('synopsis-tooltip-box');
+            if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
+            numEl.textContent = this.formatChapterNum(chapter.num);
+            titleEl.textContent = chapter.title || '';
+            if (imgEl && chapter.image) { imgEl.src = this.resolveImageUrl(chapter.image); imgEl.classList.remove('hidden'); }
+            contentEl.innerHTML = this.parseContentText(chapter.content || '<span class="text-gray-400 italic">暂无内容</span>');
+            const rect = triggerElement.getBoundingClientRect();
+            const tooltipWidth = 450, tooltipHeight = 300;
+            let top = rect.bottom + 10 + window.scrollY;
+            let left = rect.left + rect.width / 2 - tooltipWidth / 2 + window.scrollX;
+            if (left + tooltipWidth > window.innerWidth) left = window.innerWidth - tooltipWidth - 20;
+            if (left < 10) left = 10;
+            if (top + tooltipHeight > window.innerHeight + window.scrollY) top = rect.top + window.scrollY - tooltipHeight - 10;
+            tooltip.style.top = top + 'px'; tooltip.style.left = left + 'px';
+            document.body.classList.add('body-dimmed');
+            requestAnimationFrame(() => tooltip.classList.add('show'));
+            this.currentTooltipChapterId = chapterId;
+            tooltip.onclick = (e) => { e.stopPropagation(); this.closeSynopsisTooltip(); this.router('synopsis'); const idx = this.data.synopsis.findIndex(s => s.id === chapterId); if (idx !== -1) { this.data.synopsisViewIndex = idx; setTimeout(() => this.setSynopsisActiveIndex(idx), 100); } };
+            this.tooltipClickOutsideHandler = (e) => { if (!tooltip.contains(e.target) && !triggerElement.contains(e.target)) this.closeSynopsisTooltip(); };
+            setTimeout(() => document.addEventListener('click', this.tooltipClickOutsideHandler), 100);
+        },
+
+        closeSynopsisTooltip() {
+            const tooltip = document.querySelector('.synopsis-tooltip');
+            if (tooltip) tooltip.remove();
+            document.body.classList.remove('body-dimmed');
+            this.currentTooltipChapterId = null;
+            if (this.tooltipClickOutsideHandler) { document.removeEventListener('click', this.tooltipClickOutsideHandler); this.tooltipClickOutsideHandler = null; }
+        },
+
+        handleSynopsisRefHover(element) {
+            const chapterId = element.dataset.chapterId;
+            if (!chapterId) return;
+            if (this.currentTooltipChapterId === chapterId) return;
+            if (this.tooltipHoverTimeout) clearTimeout(this.tooltipHoverTimeout);
+            this.tooltipHoverTimeout = setTimeout(() => { this.tooltipHoverTimeout = null; this.showSynopsisTooltip(chapterId, element); }, 300);
+        },
+
+        handleSynopsisRefLeave(element) {
+            if (this.tooltipHoverTimeout) { clearTimeout(this.tooltipHoverTimeout); this.tooltipHoverTimeout = null; }
+            this.tooltipLeaveTimeout = setTimeout(() => {
+                this.tooltipLeaveTimeout = null;
+                const tooltip = document.querySelector('.synopsis-tooltip');
+                if (tooltip) { if (tooltip.matches(':hover')) return; this.closeSynopsisTooltip(); }
+            }, 300);
+        },
+
+        handleSynopsisRefClick(element) {
+            const chapterId = element.dataset.chapterId;
+            if (!chapterId) return;
+            if (this.tooltipHoverTimeout) { clearTimeout(this.tooltipHoverTimeout); this.tooltipHoverTimeout = null; }
+            if (this.currentTooltipChapterId === chapterId) { this.closeSynopsisTooltip(); this.router('synopsis'); const idx = this.data.synopsis.findIndex(s => s.id === chapterId); if (idx !== -1) { this.data.synopsisViewIndex = idx; setTimeout(() => this.setSynopsisActiveIndex(idx), 100); } }
+            else this.showSynopsisTooltip(chapterId, element);
+        },
+
+        // ==================== 键盘导航 ====================
+        initKeyboardListeners() {
+            if (this._keyboardHandler) document.removeEventListener('keydown', this._keyboardHandler);
+            this._keyboardHandler = (e) => {
+                if (this.data.currentView !== 'synopsis') return;
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); this.navigateSynopsis(-1); }
+                else if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); this.navigateSynopsis(1); }
+                else if (e.key === 'Escape') { this.closeSynopsisTooltip(); }
+            };
+            document.addEventListener('keydown', this._keyboardHandler, true);
+        }
+    };
+
+    // ==================== 启动 ====================
+    document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
