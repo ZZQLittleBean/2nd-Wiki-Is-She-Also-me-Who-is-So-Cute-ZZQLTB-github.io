@@ -253,7 +253,7 @@
             </div>
             <!-- 【硬编码提示文字 - 可修改位置】 -->
             <div class="text-center py-6">
-                <p class="text-xs text-gray-400">测试版本，请以实际为准；共建联系ZZQ小豆同学</p>
+                <p class="text-xs text-gray-400">测试版本，请以实际为准</p>
             </div>
         </div>
     </template>
@@ -493,6 +493,10 @@
                         this._loaded = true;
                         cacheLoaded = true;
                         console.log('[Wiki] 已从缓存加载，条目数:', this.data.entries.length);
+                        // 【新增】同步正文词条与章节
+                        if (this.data.chapters && this.data.chapters.length > 0) {
+                            this.syncBodyEntriesWithChapters();
+                        }
                         this.hideLoadingState();
                         this.setupUI();
                         this.router('home');
@@ -536,17 +540,30 @@
                         document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
                     }
                     if (cacheLoaded) {
+                        // 【新增】同步正文词条与章节
+                        if (this.data.chapters && this.data.chapters.length > 0) {
+                            this.syncBodyEntriesWithChapters();
+                        }
                         this.setupUI();
                         this.router('home');
                         this.showToast('已更新到最新数据', 'success', 2000);
                     }
                 }
             } else if (!cacheLoaded) {
-                this.showLoadError('无法加载 data/data.json');
+                // 【修复】本地环境显示友好提示
+                if (window.location.protocol === 'file:') {
+                    this.showLoadError('本地文件模式：请先将 Wiki 部署到服务器，或在服务器环境下访问。<br><span style="font-size:12px;color:#999">提示：也可通过 VS Code Live Server 等工具启动本地服务器</span>');
+                } else {
+                    this.showLoadError('无法加载 data/data.json');
+                }
                 this._loaded = false;
             }
 
             if (!cacheLoaded) {
+                // 【新增】同步正文词条与章节
+                if (this.data.chapters && this.data.chapters.length > 0) {
+                    this.syncBodyEntriesWithChapters();
+                }
                 this.setupUI();
                 this.router('home');
                 this.initKeyboardListeners();
@@ -555,6 +572,11 @@
 
         // 从网络获取数据
         async fetchFromNetwork() {
+            // 【修复】本地 file:// 环境下 fetch 会被 CORS 阻止，跳过网络请求
+            if (window.location.protocol === 'file:') {
+                console.log('[Wiki] 检测到本地文件协议，跳过网络请求');
+                return null;
+            }
             let loadedData = null;
             const pageUrl = new URL(window.location.href);
             const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
@@ -1211,6 +1233,15 @@
             const contentEl = clone.getElementById('detail-content');
 
             if (codeEl) codeEl.textContent = entry.code;
+            // 【新增】正文词条重要程度标签
+            if (isBodyEntry) {
+                const importanceLabels = { 1: ['重要章节', 'bg-orange-100 text-orange-700 border-orange-200'], 2: ['特殊章节', 'bg-purple-100 text-purple-700 border-purple-200'], 3: ['一般章节', 'bg-gray-100 text-gray-500 border-gray-200'] };
+                const label = importanceLabels[version.level] || importanceLabels[3];
+                const badge = document.createElement('span');
+                badge.className = `ml-2 inline-block px-2 py-0.5 text-xs rounded-full border ${label[1]}`;
+                badge.textContent = label[0];
+                codeEl.parentNode.insertBefore(badge, codeEl.nextSibling);
+            }
             // 【新增】正文词条不显示版本切换
             if (versionBadge && versionName && entry.versions.length > 1 && !isBodyEntry) {
                 versionBadge.classList.remove('hidden');
@@ -1225,24 +1256,44 @@
                 cardImg = bodySynopsis.image;
             }
             cardImg = this.resolveImageUrl(cardImg);
+            // 【修复】正文词条图片支持 {{IMG:}} 格式
+            if (isBodyEntry && cardImg && cardImg.startsWith('{{IMG:')) {
+                cardImg = this.resolveImageUrl(cardImg);
+            }
             const hasImage = cardImg && (cardImg.startsWith('data:') || cardImg.startsWith('http') || cardImg.startsWith('blob:'));
+
+            // 【修复】正文词条：剧情梗概文本安全处理
+            let synopsisHtmlGh = '';
+            if (isBodyEntry && bodySynopsis) {
+                try {
+                    synopsisHtmlGh = this.parseContentText ? this.parseContentText(bodySynopsis.content || '暂无梗概内容') : (bodySynopsis.content || '暂无梗概内容');
+                } catch (e) {
+                    console.warn('[renderDetail] parseContentText 失败:', e);
+                    synopsisHtmlGh = bodySynopsis.content || '暂无梗概内容';
+                }
+            }
 
             // 标题区域
             let headerHtml = `<div class="flex-1 min-w-0">
                 <h1 class="text-3xl font-bold text-gray-900 mb-3 leading-tight">${this.escapeHtml(version.title)}</h1>
                 ${version.subtitle && !isBodyEntry ? `<div class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4 leading-relaxed" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${this.parseInlineMarkdown(this.escapeHtml(version.subtitle))}</div>` : ''}
-                ${isBodyEntry && bodySynopsis ? `<div class="text-base text-gray-600 border-l-4 border-amber-300 pl-4 leading-relaxed bg-amber-50/50 p-3 rounded-r-lg">
-                    <div class="text-xs text-amber-600 mb-1 font-bold"><i class="fa-solid fa-book-open mr-1"></i>剧情梗概</div>
-                    <div style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${this.parseContentText(bodySynopsis.content || '暂无梗概内容')}</div>
+                ${isBodyEntry && bodySynopsis ? `<div class="text-sm text-gray-500 border-l-4 border-gray-300 pl-4 leading-relaxed bg-gray-50/50 p-3 rounded-r-lg">
+                    <div class="text-xs text-gray-400 mb-1 font-medium"><i class="fa-solid fa-book-open mr-1"></i>剧情梗概</div>
+                    <div style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${synopsisHtmlGh}</div>
                 </div>` : ''}
             </div>`;
 
-            const imageHtml = hasImage ? `<div class="w-56 shrink-0">
-                <div class="aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 sticky top-24">
-                    <img src="${cardImg}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-gray-300\\'><i class=\\'fa-solid fa-image text-4xl\\'></i></div>'" alt="${this.escapeHtml(version.title)}">
+            // 【修复】正文词条图片：原比例、居中、独立一行
+            const imageHtml = hasImage ? (isBodyEntry ? `<div class="w-full max-w-2xl mx-auto my-6">
+                <div class="rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200">
+                    <img src="${cardImg}" class="w-full h-auto object-contain" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'w-full h-48 flex items-center justify-center text-gray-300\'><i class=\'fa-solid fa-image text-4xl\'></i></div>'" alt="${this.escapeHtml(version.title)}">
                 </div>
-                ${!isBodyEntry && (version.level <= 2 || entry.level <= 2) ? `<div class="text-center mt-3"><span class="inline-block px-4 py-1.5 ${(version.level === 1 || entry.level === 1) ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border rounded-full text-sm font-bold">${(version.level === 1 || entry.level === 1) ? '★ 主角' : '重要角色'}</span></div>` : ''}
-            </div>` : '';
+            </div>` : `<div class="w-56 shrink-0">
+                <div class="aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 sticky top-24">
+                    <img src="${cardImg}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'w-full h-full flex items-center justify-center text-gray-300\'><i class=\'fa-solid fa-image text-4xl\'></i></div>'" alt="${this.escapeHtml(version.title)}">
+                </div>
+                ${(version.level <= 2 || entry.level <= 2) ? `<div class="text-center mt-3"><span class="inline-block px-4 py-1.5 ${(version.level === 1 || entry.level === 1) ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border rounded-full text-sm font-bold">${(version.level === 1 || entry.level === 1) ? '★ 主角' : '重要角色'}</span></div>` : ''}
+            </div>`) : '';
 
             // ========== 核心修复：正文内容渲染（统一索引解析） ==========
             let contentBlocksHtml = '<div class="prose prose-sm max-w-none mt-6">';
@@ -1265,7 +1316,14 @@
             contentBlocksHtml += '</div>';
 
             if (contentEl) {
-                contentEl.innerHTML = `<div class="flex flex-col md:flex-row gap-6 mb-2">${headerHtml}${imageHtml}</div>${contentBlocksHtml}`;
+                if (contentEl) {
+                // 【修复】正文词条：图片独立居中；其他词条：标题+图片并排
+                if (isBodyEntry) {
+                    contentEl.innerHTML = `${headerHtml}${imageHtml}${contentBlocksHtml}`;
+                } else {
+                    contentEl.innerHTML = `<div class="flex flex-col md:flex-row gap-6 mb-2">${headerHtml}${imageHtml}</div>${contentBlocksHtml}`;
+                }
+            }
             }
 
             // 【新增】回到'xx'按钮
@@ -2252,6 +2310,58 @@
         },
 
         // ==================== 【新增】正文词条管理 ==========
+        syncBodyEntriesWithChapters() {
+            if (!this.data.chapters || this.data.chapters.length === 0) return;
+            const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+            // 1. 删除没有对应章节的正文词条
+            this.data.entries = this.data.entries.filter(e => {
+                if (e.type !== 'body') return true;
+                const chapterId = e.versions[0]?.chapterFrom;
+                return sortedChapters.some(ch => ch.id === chapterId);
+            });
+            // 2. 为没有正文词条的章节创建正文词条
+            sortedChapters.forEach(ch => {
+                const existingBody = this.data.entries.find(e => e.type === 'body' && e.versions[0]?.chapterFrom === ch.id);
+                if (!existingBody) this.createBodyEntry(ch);
+            });
+            // 3. 同步标题
+            this.data.entries.forEach(e => {
+                if (e.type !== 'body' || !e.versions[0]) return;
+                const ch = sortedChapters.find(c => c.id === e.versions[0].chapterFrom);
+                if (ch) e.versions[0].title = ch.title || `第${this.formatChapterNum(ch.num)}章`;
+            });
+        },
+
+        createBodyEntry(chapter) {
+            // 生成B-编号
+            const bodyEntries = this.data.entries.filter(e => e.type === 'body');
+            const usedNumbers = bodyEntries.map(e => { const m = e.code.match(/B-(\d+)/); return m ? parseInt(m[1]) : 0; });
+            let nextNum = 1; while (usedNumbers.includes(nextNum)) nextNum++;
+            const code = 'B-' + String(nextNum).padStart(3, '0');
+            const bodyEntry = {
+                id: 'body-' + chapter.id,
+                type: 'body',
+                code: code,
+                camp: null,
+                settingType: null,
+                versions: [{
+                    vid: 'v-body-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                    title: chapter.title || `第${this.formatChapterNum(chapter.num)}章`,
+                    subtitle: '',
+                    level: 3,
+                    image: null,
+                    images: { avatar: null, card: null, cover: null },
+                    chapterFrom: chapter.id,
+                    chapterTo: null,
+                    blocks: [],
+                    relatedCharacters: [],
+                    relatedVersions: [],
+                    createdAt: Date.now()
+                }]
+            };
+            this.data.entries.push(bodyEntry);
+        },
+
         openBodyEntry(chapterId) {
             const bodyEntry = this.data.entries.find(e => e.type === 'body' && e.versions[0]?.chapterFrom === chapterId);
             if (!bodyEntry) { this.showToast('该章节暂无正文词条', 'warning'); return; }
