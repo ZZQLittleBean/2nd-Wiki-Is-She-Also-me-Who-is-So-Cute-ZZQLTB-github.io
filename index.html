@@ -2077,10 +2077,11 @@
                 // 解析内容中的索引
                 let contentHtml = this.parseContentText(chapter.content || '');
 
-                // 【新增】检查是否存在正文词条
-                const hasBodyEntry = this.data.entries.some(e => e.type === 'body' && e.versions[0]?.chapterFrom === chapter.id);
+                // 【新增】检查是否存在正文词条（使用 chapterId 关联）
+                const chId = chapter.chapterId || chapter.id;
+                const hasBodyEntry = this.data.entries.some(e => e.type === 'body' && e.versions[0]?.chapterFrom === chId);
                 const viewBodyBtn = hasBodyEntry ? `
-                    <button onclick="event.stopPropagation(); app.openBodyEntry('${chapter.id}')" 
+                    <button onclick="event.stopPropagation(); app.openBodyEntry('${chId}')" 
                         class="ml-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full text-xs font-medium transition flex items-center gap-1">
                         <i class="fa-solid fa-book-open"></i> 查看正文
                     </button>
