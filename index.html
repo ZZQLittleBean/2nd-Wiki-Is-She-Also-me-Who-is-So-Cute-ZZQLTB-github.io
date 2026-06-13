@@ -251,6 +251,10 @@
                     <div id="history-list" class="space-y-2"></div>
                 </div>
             </div>
+            <!-- 【硬编码提示文字 - 可修改位置】 -->
+            <div class="text-center py-6">
+                <p class="text-xs text-gray-400">测试版本，请以实际为准</p>
+            </div>
         </div>
     </template>
 
@@ -384,7 +388,11 @@
             currentTimeline: 'latest',
             codeCounters: { C: 0, N: 0 },
             graphState: { scale: 1, translateX: 0, translateY: 0 },
-            synopsisViewIndex: 0
+            synopsisViewIndex: 0,
+            about: null,
+            previousEntryId: null,
+            previousEntryName: null,
+            previousEntryType: null
         },
         _loaded: false,
         _keyboardHandler: null,
@@ -1173,6 +1181,11 @@
                 return;
             }
 
+            // 【新增】正文词条特殊处理
+            const isBodyEntry = entry.type === 'body';
+            const bodyChapter = isBodyEntry ? this.data.chapters.find(ch => ch.id === entry.versions[0]?.chapterFrom) : null;
+            const bodySynopsis = isBodyEntry && bodyChapter ? this.data.synopsis.find(s => s.chapterId === bodyChapter.id || s.id === bodyChapter.id) : null;
+
             let version = entry.versions.find(v => v.vid === this.data.viewingVersionId) ||
                           this.getVisibleVersion(entry) ||
                           entry.versions[entry.versions.length - 1];
@@ -1198,7 +1211,8 @@
             const contentEl = clone.getElementById('detail-content');
 
             if (codeEl) codeEl.textContent = entry.code;
-            if (versionBadge && versionName && entry.versions.length > 1) {
+            // 【新增】正文词条不显示版本切换
+            if (versionBadge && versionName && entry.versions.length > 1 && !isBodyEntry) {
                 versionBadge.classList.remove('hidden');
                 const vIndex = entry.versions.findIndex(v => v.vid === version.vid);
                 versionName.textContent = `${vIndex + 1}/${entry.versions.length}`;
@@ -1206,20 +1220,28 @@
 
             // 处理图片
             let cardImg = version.images?.card || version.images?.avatar || version.image;
+            // 【新增】正文词条默认使用剧情梗概图片
+            if (isBodyEntry && bodySynopsis && bodySynopsis.image) {
+                cardImg = bodySynopsis.image;
+            }
             cardImg = this.resolveImageUrl(cardImg);
             const hasImage = cardImg && (cardImg.startsWith('data:') || cardImg.startsWith('http') || cardImg.startsWith('blob:'));
 
             // 标题区域
             let headerHtml = `<div class="flex-1 min-w-0">
                 <h1 class="text-3xl font-bold text-gray-900 mb-3 leading-tight">${this.escapeHtml(version.title)}</h1>
-                ${version.subtitle ? `<div class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4 leading-relaxed" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${this.parseInlineMarkdown(this.escapeHtml(version.subtitle))}</div>` : ''}
+                ${version.subtitle && !isBodyEntry ? `<div class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4 leading-relaxed" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${this.parseInlineMarkdown(this.escapeHtml(version.subtitle))}</div>` : ''}
+                ${isBodyEntry && bodySynopsis ? `<div class="text-base text-gray-600 border-l-4 border-amber-300 pl-4 leading-relaxed bg-amber-50/50 p-3 rounded-r-lg">
+                    <div class="text-xs text-amber-600 mb-1 font-bold"><i class="fa-solid fa-book-open mr-1"></i>剧情梗概</div>
+                    <div style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${this.parseContentText(bodySynopsis.content || '暂无梗概内容')}</div>
+                </div>` : ''}
             </div>`;
 
             const imageHtml = hasImage ? `<div class="w-56 shrink-0">
                 <div class="aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 sticky top-24">
                     <img src="${cardImg}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-gray-300\\'><i class=\\'fa-solid fa-image text-4xl\\'></i></div>'" alt="${this.escapeHtml(version.title)}">
                 </div>
-                ${(version.level <= 2 || entry.level <= 2) ? `<div class="text-center mt-3"><span class="inline-block px-4 py-1.5 ${(version.level === 1 || entry.level === 1) ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border rounded-full text-sm font-bold">${(version.level === 1 || entry.level === 1) ? '★ 主角' : '重要角色'}</span></div>` : ''}
+                ${!isBodyEntry && (version.level <= 2 || entry.level <= 2) ? `<div class="text-center mt-3"><span class="inline-block px-4 py-1.5 ${(version.level === 1 || entry.level === 1) ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border rounded-full text-sm font-bold">${(version.level === 1 || entry.level === 1) ? '★ 主角' : '重要角色'}</span></div>` : ''}
             </div>` : '';
 
             // ========== 核心修复：正文内容渲染（统一索引解析） ==========
@@ -1246,21 +1268,56 @@
                 contentEl.innerHTML = `<div class="flex flex-col md:flex-row gap-6 mb-2">${headerHtml}${imageHtml}</div>${contentBlocksHtml}`;
             }
 
+            // 【新增】回到'xx'按钮
+            const backBtnArea = clone.querySelector('.flex.items-center.gap-2');
+            if (backBtnArea && this.data.previousEntryId && this.data.previousEntryName) {
+                const prevBtn = document.createElement('button');
+                prevBtn.className = 'px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition text-sm flex items-center gap-1.5 border border-indigo-200';
+                prevBtn.innerHTML = `<i class="fa-solid fa-reply"></i> 回到'${this.data.previousEntryName}'`;
+                prevBtn.onclick = () => this.goBackToPrevious();
+                const existingBackBtn = backBtnArea.querySelector('button');
+                if (existingBackBtn) existingBackBtn.parentNode.insertBefore(prevBtn, existingBackBtn.nextSibling);
+            }
+
             // 相关角色
             const relatedSection = clone.getElementById('related-characters-section');
             const relatedList = clone.getElementById('related-characters-list');
             if (relatedSection && relatedList && version.relatedCharacters?.length > 0) {
-                relatedSection.classList.remove('hidden');
-                version.relatedCharacters.forEach(rc => {
-                    const charEntry = this.data.entries.find(e => e.id === rc.charId);
-                    if (!charEntry) return;
-                    const charVersion = this.getVisibleVersion(charEntry);
-                    const tag = document.createElement('span');
-                    tag.className = 'inline-flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-indigo-100 rounded-full text-xs cursor-pointer transition';
-                    tag.innerHTML = `<span class="font-medium">${this.escapeHtml(charVersion?.title || charEntry.code)}</span><span class="text-gray-400">.${this.escapeHtml(rc.relationName)}</span>`;
-                    tag.onclick = () => this.openEntry(charEntry.id);
-                    relatedList.appendChild(tag);
-                });
+                // 【新增】正文词条只显示角色与设定关联
+                const validRelations = isBodyEntry ? version.relatedCharacters.filter(rc => {
+                    const relatedEntry = this.data.entries.find(e => e.id === rc.charId);
+                    return relatedEntry && (relatedEntry.type === 'character' || relatedEntry.type === 'non-character');
+                }) : version.relatedCharacters;
+                if (validRelations.length > 0) {
+                    relatedSection.classList.remove('hidden');
+                    const relatedTitle = relatedSection.querySelector('h3');
+                    if (relatedTitle && isBodyEntry) relatedTitle.innerHTML = '<i class="fa-solid fa-users text-indigo-500 mr-2"></i>相关角色与设定';
+                    validRelations.forEach(rc => {
+                        const charEntry = this.data.entries.find(e => e.id === rc.charId);
+                        if (!charEntry) return;
+                        const charVersion = this.getVisibleVersion(charEntry);
+                        const tag = document.createElement('span');
+                        tag.className = 'inline-flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-indigo-100 rounded-full text-xs cursor-pointer transition';
+                        tag.innerHTML = `<span class="font-medium">${this.escapeHtml(charVersion?.title || charEntry.code)}</span><span class="text-gray-400">.${this.escapeHtml(rc.relationName)}</span>`;
+                        tag.onclick = () => this.openEntry(charEntry.id);
+                        relatedList.appendChild(tag);
+                    });
+                }
+            }
+
+            // 【新增】正文词条章节导航
+            if (isBodyEntry && bodyChapter) {
+                const navDiv = document.createElement('div');
+                navDiv.className = 'mt-6 flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200';
+                const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+                const currentIdx = sortedChapters.findIndex(ch => ch.id === bodyChapter.id);
+                const prevChapter = currentIdx > 0 ? sortedChapters[currentIdx - 1] : null;
+                const nextChapter = currentIdx < sortedChapters.length - 1 ? sortedChapters[currentIdx + 1] : null;
+                navDiv.innerHTML = `
+                    <button onclick="app.navigateBodyEntry(-1)" class="flex items-center gap-2 px-4 py-2 rounded-lg transition ${prevChapter ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}" ${!prevChapter ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i><div class="text-left"><div class="text-xs opacity-70">上一章</div><div class="text-sm font-medium">${prevChapter ? this.escapeHtml(prevChapter.title || this.formatChapterNum(prevChapter.num)) : '无'}</div></div></button>
+                    <div class="text-center"><div class="text-xs text-gray-400">${this.escapeHtml(this.formatChapterNum(bodyChapter.num))}</div>${bodyChapter.title ? `<div class="text-sm font-bold text-gray-700">${this.escapeHtml(bodyChapter.title)}</div>` : ''}</div>
+                    <button onclick="app.navigateBodyEntry(1)" class="flex items-center gap-2 px-4 py-2 rounded-lg transition ${nextChapter ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}" ${!nextChapter ? 'disabled' : ''}><div class="text-right"><div class="text-xs opacity-70">下一章</div><div class="text-sm font-medium">${nextChapter ? this.escapeHtml(nextChapter.title || this.formatChapterNum(nextChapter.num)) : '无'}</div></div><i class="fa-solid fa-chevron-right"></i></button>`;
+                contentEl.appendChild(navDiv);
             }
 
             // 版本切换提示
@@ -1664,6 +1721,16 @@
         openEntry(entryId, versionId) {
             const entry = this.data.entries.find(e => e.id === entryId);
             if (!entry) return;
+            // 【新增】浏览历史追踪
+            const currentEntry = this.data.editingId ? this.data.entries.find(e => e.id === this.data.editingId) : null;
+            if (currentEntry && currentEntry.id !== entry.id) {
+                if (!(currentEntry.type === 'body' && entry.type === 'body')) {
+                    this.data.previousEntryId = currentEntry.id;
+                    const visVer = this.getVisibleVersion(currentEntry);
+                    this.data.previousEntryName = visVer ? visVer.title : currentEntry.code;
+                    this.data.previousEntryType = currentEntry.type;
+                }
+            }
             this.data.editingId = entryId;
             if (versionId && entry.versions.some(v => v.vid === versionId)) {
                 this.data.viewingVersionId = versionId;
@@ -1680,6 +1747,11 @@
 
         goBack() {
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            // 【新增】正文词条返回剧情梗概
+            if (entry && entry.type === 'body') {
+                this.router('synopsis');
+                return;
+            }
             if (entry && entry.type === 'non-character') this.router('non-characters');
             else this.router('characters');
         },
@@ -1947,10 +2019,22 @@
                 // 解析内容中的索引
                 let contentHtml = this.parseContentText(chapter.content || '');
 
+                // 【新增】检查是否存在正文词条
+                const hasBodyEntry = this.data.entries.some(e => e.type === 'body' && e.versions[0]?.chapterFrom === chapter.id);
+                const viewBodyBtn = hasBodyEntry ? `
+                    <button onclick="event.stopPropagation(); app.openBodyEntry('${chapter.id}')" 
+                        class="ml-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full text-xs font-medium transition flex items-center gap-1">
+                        <i class="fa-solid fa-book-open"></i> 查看正文
+                    </button>
+                ` : '';
+
                 item.innerHTML = `
-                    <div class="synopsis-view-header">
-                        <span class="synopsis-view-num">${this.escapeHtml(this.formatChapterNum(chapter.num))}</span>
-                        <span class="synopsis-view-title">${this.escapeHtml(chapter.title || '')}</span>
+                    <div class="synopsis-view-header flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="synopsis-view-num">${this.escapeHtml(this.formatChapterNum(chapter.num))}</span>
+                            <span class="synopsis-view-title">${this.escapeHtml(chapter.title || '')}</span>
+                        </div>
+                        ${viewBodyBtn}
                     </div>
                     ${imgHtml}
                     <div class="synopsis-view-content line-clamp" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;">${contentHtml}</div>`;
@@ -2004,8 +2088,11 @@
         switchToSynopsisTime() {
             const chapter = this.data.synopsis[this.data.synopsisViewIndex];
             if (!chapter) return;
-            this.setTimeline(chapter.chapterId);
-            this.updateSwitchTimeButton();
+            const chapterId = chapter.chapterId || chapter.id;
+            if (chapterId) {
+                this.setTimeline(chapterId);
+                this.updateSwitchTimeButton();
+            }
         },
 
         // ==================== 剧情引用悬浮窗 ====================
@@ -2087,11 +2174,202 @@
                 else if (e.key === 'Escape') { this.closeSynopsisTooltip(); }
             };
             document.addEventListener('keydown', this._keyboardHandler, true);
+        },
+
+        // ==================== 【新增】关于页面 ==========
+        viewAbout() {
+            const about = this.data.about;
+            if (!about) { this.showToast('暂无关于信息', 'info'); return; }
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
+            overlay.id = 'about-overlay';
+            const markdownHtml = about.content ? this.parseMarkdown(about.content) : '<p class="text-gray-400 italic">暂无内容</p>';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                    <div class="p-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-xl text-gray-800">${this.escapeHtml(about.title || '关于')}</h3>
+                            <p class="text-xs text-gray-500 mt-1">${about.author ? this.escapeHtml(about.author) + ' \u00b7 ' : ''}${about.date || ''}</p>
+                        </div>
+                        <button onclick="document.getElementById('about-overlay').remove()" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    <div class="p-6 overflow-y-auto prose prose-sm max-w-none">${markdownHtml}</div>
+                    <div class="p-4 border-t bg-gray-50 text-center">
+                        <button onclick="document.getElementById('about-overlay').remove()" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition text-sm">关闭</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        },
+
+        parseMarkdown(text) {
+            if (!text) return '';
+            let html = this.escapeHtml(text);
+            html = html.replace(/^###### (.*$)/gim, '<h6 class="text-sm font-bold text-gray-700 mt-4 mb-2">$1</h6>');
+            html = html.replace(/^##### (.*$)/gim, '<h5 class="text-base font-bold text-gray-700 mt-4 mb-2">$1</h5>');
+            html = html.replace(/^#### (.*$)/gim, '<h4 class="text-lg font-bold text-gray-800 mt-4 mb-2">$1</h4>');
+            html = html.replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold text-gray-800 mt-6 mb-3 border-b pb-1">$1</h3>');
+            html = html.replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">$1</h2>');
+            html = html.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold text-gray-900 mt-8 mb-4">$1</h1>');
+            html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/~~(.*?)~~/g, '<del>$1</del>');
+            html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">$1</code>');
+            html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm my-4"><code>$1</code></pre>');
+            html = html.replace(/^> (.*$)/gim, '<blockquote class="border-l-4 border-indigo-300 pl-4 my-4 text-gray-600 italic">$1</blockquote>');
+            html = html.replace(/^---$/gim, '<hr class="my-6 border-gray-200">');
+            html = html.replace(/^\* \* \*$/gim, '<hr class="my-6 border-gray-200">');
+            html = html.replace(/^___$/gim, '<hr class="my-6 border-gray-200">');
+            html = html.replace(/^\- (.*$)/gim, '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>$1</span></li>');
+            html = html.replace(/^\* (.*$)/gim, '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>$1</span></li>');
+            html = html.replace(/^\d+\. (.*$)/gim, '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 font-bold min-w-[1.5rem]">$&</span></li>');
+            html = html.replace(/<span class="text-indigo-500 font-bold min-w-\[1\.5rem\]">(\d+)\.\s(.*?)<\/span>/g, '<span class="text-indigo-500 font-bold min-w-[1.5rem]">$1.</span><span>$2</span>');
+            html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank" class="text-indigo-600 hover:underline">$1</a>');
+            html = html.replace(/<(https?:\/\/[^ >]+)>/g, '<a href="$1" target="_blank" class="text-indigo-600 hover:underline">$1</a>');
+            html = html.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded-lg my-4">');
+            // 表格
+            const lines = html.split('\n');
+            let inTable = false, tableHtml = [], result = [];
+            for (const line of lines) {
+                if (line.includes('|') && !inTable) { inTable = true; tableHtml = []; }
+                if (inTable) {
+                    if (!line.includes('|')) {
+                        if (tableHtml.length > 0) {
+                            result.push('<table class="min-w-full my-4 border-collapse border border-gray-200 rounded-lg overflow-hidden">');
+                            tableHtml.forEach((row, idx) => { const tag = idx === 0 ? 'th' : 'td'; const bgClass = idx === 0 ? 'bg-gray-100 font-bold' : 'bg-white'; const cells = row.split('|').map(c => c.trim()).filter(c => c); if (cells.length > 0) { result.push(`<tr class="${bgClass} border-b border-gray-200">`); cells.forEach(cell => { result.push(`<${tag} class="px-4 py-2 text-left text-sm ${idx === 0 ? 'text-gray-700' : 'text-gray-600'}">${cell}</${tag}>`); }); result.push('</tr>'); } });
+                            result.push('</table>');
+                        }
+                        inTable = false;
+                    } else { tableHtml.push(line); continue; }
+                }
+                result.push(line);
+            }
+            html = result.join('\n');
+            html = html.replace(/^(?!<[a-z]|<\/|<li|<\/li|<hr|<pre|<blockquote|<table|<\/table|<tr|<\/tr|<td|<\/td|<th|<\/th|<h|<code|<img|<a)(.+)$/gim, '<p class="my-2 text-gray-700 leading-relaxed">$1</p>');
+            html = html.replace(/<p class="my-2 text-gray-700 leading-relaxed"><\/p>/g, '');
+            return html;
+        },
+
+        // ==================== 【新增】正文词条管理 ==========
+        openBodyEntry(chapterId) {
+            const bodyEntry = this.data.entries.find(e => e.type === 'body' && e.versions[0]?.chapterFrom === chapterId);
+            if (!bodyEntry) { this.showToast('该章节暂无正文词条', 'warning'); return; }
+            if (this.data.editingId) {
+                const currentEntry = this.data.entries.find(e => e.id === this.data.editingId);
+                if (currentEntry && currentEntry.type === 'body') {
+                    this.data.previousEntryId = null;
+                    this.data.previousEntryName = null;
+                    this.data.previousEntryType = null;
+                }
+            }
+            this.openEntry(bodyEntry.id);
+        },
+
+        navigateBodyEntry(direction) {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            if (!entry || entry.type !== 'body' || !entry.versions[0]) return;
+            const currentChapterId = entry.versions[0].chapterFrom;
+            const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+            const currentIdx = sortedChapters.findIndex(ch => ch.id === currentChapterId);
+            if (currentIdx === -1) return;
+            const newIdx = currentIdx + direction;
+            if (newIdx < 0 || newIdx >= sortedChapters.length) { this.showToast('已经是' + (direction < 0 ? '第一章' : '最后一章'), 'info'); return; }
+            this.openBodyEntry(sortedChapters[newIdx].id);
+        },
+
+        goBackToPrevious() {
+            if (this.data.previousEntryId) {
+                const prevId = this.data.previousEntryId;
+                this.data.previousEntryId = null;
+                this.data.previousEntryName = null;
+                this.data.previousEntryType = null;
+                this.openEntry(prevId);
+            }
         }
     };
 
     // ==================== 启动 ====================
     document.addEventListener('DOMContentLoaded', () => app.init());
     </script>
+
+    <!-- 【新增】关于悬浮按键 -->
+    <div id="about-float-btn" class="fixed z-[9999] bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg cursor-pointer flex items-center justify-center transition-all hover:scale-110"
+         style="width: 48px; height: 48px; bottom: 20px; right: 20px;"
+         onclick="app.viewAbout()"
+         title="关于">
+        <i class="fa-solid fa-info text-lg"></i>
+    </div>
+    <style>
+        #about-float-btn { 
+            position: fixed !important;
+            transition: all 0.3s ease;
+        }
+        #about-float-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+        }
+        #about-float-btn.dragging {
+            opacity: 0.8;
+            cursor: grabbing !important;
+        }
+    </style>
+    <script>
+        // 可拖拽功能
+        (function() {
+            const btn = document.getElementById('about-float-btn');
+            if (!btn) return;
+            let isDragging = false, startX, startY, initialLeft, initialTop;
+            btn.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                btn.classList.add('dragging');
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = btn.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                btn.style.left = (initialLeft + dx) + 'px';
+                btn.style.top = (initialTop + dy) + 'px';
+                btn.style.bottom = 'auto';
+                btn.style.right = 'auto';
+            });
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    btn.classList.remove('dragging');
+                }
+            });
+            // 触摸支持
+            btn.addEventListener('touchstart', function(e) {
+                isDragging = true;
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                const rect = btn.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+            }, {passive: true});
+            document.addEventListener('touchmove', function(e) {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                btn.style.left = (initialLeft + dx) + 'px';
+                btn.style.top = (initialTop + dy) + 'px';
+                btn.style.bottom = 'auto';
+                btn.style.right = 'auto';
+            }, {passive: true});
+            document.addEventListener('touchend', function() {
+                isDragging = false;
+            });
+        })();
+    </script>
+
 </body>
 </html>
