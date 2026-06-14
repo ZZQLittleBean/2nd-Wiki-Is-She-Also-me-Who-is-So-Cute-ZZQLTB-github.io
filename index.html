@@ -568,6 +568,37 @@
                 this.router('home');
                 this.initKeyboardListeners();
             }
+            
+            // 【新增】加载 about.json（无论哪个路径都执行）
+            this.loadAbout();
+        },
+
+        // 【新增】加载 about.json
+        async loadAbout() {
+            if (window.location.protocol === 'file:') return;
+            const pageUrl = new URL(window.location.href);
+            const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
+            const possiblePaths = [
+                new URL('data/about.json', pageUrl.origin + basePath).href,
+                new URL('./data/about.json', pageUrl.href).href,
+                './data/about.json',
+                'data/about.json',
+                '/data/about.json'
+            ];
+            for (const path of possiblePaths) {
+                try {
+                    const response = await fetch(path, { cache: 'no-cache' });
+                    if (response.ok) {
+                        const about = await response.json();
+                        if (about && about.title) {
+                            this.data.about = about;
+                            console.log('[Wiki] about.json 加载成功:', about.title);
+                            return;
+                        }
+                    }
+                } catch (e) {}
+            }
+            console.log('[Wiki] about.json 未找到');
         },
 
         // 从网络获取数据
