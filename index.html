@@ -661,9 +661,9 @@
                     const response = await fetch(path, { cache: 'no-cache' });
                     if (response.ok) {
                         const about = await response.json();
-                        if (about && about.title) {
+                        if (about && (about.content || about.author || about.date)) {
                             this.data.about = about;
-                            console.log('[Wiki] about.json 加载成功:', about.title);
+                            console.log('[Wiki] about.json 加载成功');
                             return;
                         }
                     }
@@ -986,20 +986,37 @@
         },
 
         async loadAboutInfo() {
-            try {
-                if (this.githubStorage && this.githubStorage.config && this.githubStorage.config.owner) {
-                    try {
-                        const file = await this.githubStorage.getFile('about.json');
-                        if (file && file.content) {
-                            return JSON.parse(file.content);
-                        }
-                    } catch (e) {
-                        console.log('[About] 无法从GitHub加载about.json:', e.message);
-                    }
-                }
-            } catch (e) {
-                console.warn('[About] 加载关于信息失败:', e);
+            // 1. 优先使用已由 loadAbout() 加载到 data.about 的数据
+            if (this.data.about && this.data.about.content) {
+                console.log('[About] 使用已缓存的 about 数据');
+                return this.data.about;
             }
+            // 2. 直接通过 fetch 尝试加载（与 loadAbout 相同的备选路径策略）
+            if (window.location.protocol !== 'file:') {
+                const pageUrl = new URL(window.location.href);
+                const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
+                const possiblePaths = [
+                    new URL('data/about.json', pageUrl.origin + basePath).href,
+                    new URL('./data/about.json', pageUrl.href).href,
+                    './data/about.json',
+                    'data/about.json',
+                    '/data/about.json'
+                ];
+                for (const path of possiblePaths) {
+                    try {
+                        const response = await fetch(path, { cache: 'no-cache' });
+                        if (response.ok) {
+                            const about = await response.json();
+                            if (about && about.content) {
+                                this.data.about = about;
+                                console.log('[About] 成功加载 about.json:', path);
+                                return about;
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            console.log('[About] about.json 未找到或内容为空');
             return null;
         },
 
