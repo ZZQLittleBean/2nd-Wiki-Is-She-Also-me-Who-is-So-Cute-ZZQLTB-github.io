@@ -202,6 +202,9 @@
             <button onclick="app.router('synopsis')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="synopsis">
                 <i class="fa-solid fa-film text-lg"></i><span class="text-[10px]">剧情</span>
             </button>
+            <button onclick="app.router('about')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="about">
+                <i class="fa-solid fa-circle-info text-lg"></i><span class="text-[10px]">关于</span>
+            </button>
         </div>
     </nav>
 
@@ -367,6 +370,74 @@
             </div>
         </div>
     </template>
+
+    <!-- 关于页面模板 -->
+    <template id="tpl-about">
+        <div class="h-full overflow-y-auto p-4 fade-in pb-20">
+            <div class="max-w-2xl mx-auto space-y-4">
+                <!-- 关于信息头部 -->
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                    <div class="absolute top-0 right-0 opacity-10 transform translate-x-10 -translate-y-10">
+                        <i class="fa-solid fa-circle-info text-9xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-2 relative z-10">
+                        <i class="fa-solid fa-circle-info mr-2"></i>关于
+                    </h2>
+                    <p class="opacity-90 text-sm relative z-10">Wiki 的基本信息与介绍</p>
+                </div>
+
+                <!-- 关于信息内容 -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <div id="about-content-display" class="prose prose-sm max-w-none">
+                        <p class="text-gray-500 text-center py-8">暂无关于信息</p>
+                    </div>
+                </div>
+
+                <!-- Wiki 信息统计 -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-indigo-600"></i> Wiki 统计
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="bg-gray-50 rounded-lg p-3 text-center">
+                            <div id="about-stat-entries" class="text-2xl font-bold text-indigo-600">0</div>
+                            <div class="text-gray-500 text-xs">词条总数</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3 text-center">
+                            <div id="about-stat-characters" class="text-2xl font-bold text-blue-600">0</div>
+                            <div class="text-gray-500 text-xs">角色数量</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3 text-center">
+                            <div id="about-stat-settings" class="text-2xl font-bold text-emerald-600">0</div>
+                            <div class="text-gray-500 text-xs">设定数量</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3 text-center">
+                            <div id="about-stat-versions" class="text-2xl font-bold text-purple-600">0</div>
+                            <div class="text-gray-500 text-xs">版本总数</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 版本信息 -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-code-branch text-gray-600"></i> 版本信息
+                    </h3>
+                    <div class="text-xs text-gray-500 space-y-1">
+                        <div class="flex justify-between">
+                            <span>Wiki 版本:</span>
+                            <span class="font-medium text-gray-700">demov2.7-GitHub</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>数据格式版本:</span>
+                            <span class="font-medium text-gray-700">2.5.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
 
     <!-- ========== JavaScript ========== -->
     <script>
@@ -841,7 +912,7 @@
             // 更新底部导航高亮
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 const target = btn.dataset.target;
-                if (target === view || (view === 'detail' && target === 'characters') || (view === 'non-characters' && target === 'non-characters')) {
+                if (target === view || (view === 'detail' && target === 'characters') || (view === 'non-characters' && target === 'non-characters') || (view === 'about' && target === 'about')) {
                     btn.classList.add('text-indigo-600');
                     btn.classList.remove('text-gray-500');
                 } else {
@@ -860,6 +931,7 @@
                 case 'graph': this.renderGraph(container); break;
                 case 'detail': this.renderDetail(container); break;
                 case 'synopsis': this.renderSynopsisView(container); break;
+                case 'about': this.renderAbout(container); break;
                 default: this.renderHome(container);
             }
         },
@@ -877,6 +949,75 @@
             if (titleEl) titleEl.textContent = title || '暂无数据';
             if (descEl) descEl.textContent = desc || '管理员尚未添加内容，请检查存档文件是否正确放置。';
             container.appendChild(clone);
+        },
+
+        // ==================== 关于页面 ====================
+        renderAbout(container) {
+            const tpl = document.getElementById('tpl-about');
+            if (!tpl) {
+                container.innerHTML = '<div class="p-4 text-red-600">关于页面模板不存在</div>';
+                return;
+            }
+            const clone = tpl.content.cloneNode(true);
+            container.appendChild(clone);
+
+            // Load and display about info
+            this.loadAboutInfo().then(aboutInfo => {
+                const displayEl = document.getElementById('about-content-display');
+                if (displayEl && aboutInfo) {
+                    const html = this.renderMarkdown(aboutInfo.content || '');
+                    const author = aboutInfo.author || '';
+                    const date = aboutInfo.date || '';
+                    let headerHtml = '';
+                    if (author || date) {
+                        headerHtml = `<div class="flex items-center gap-3 text-xs text-gray-400 mb-4 pb-3 border-b border-gray-100">`;
+                        if (author) headerHtml += `<span><i class="fa-solid fa-user mr-1"></i>${author}</span>`;
+                        if (date) headerHtml += `<span><i class="fa-solid fa-calendar mr-1"></i>${date}</span>`;
+                        headerHtml += `</div>`;
+                    }
+                    displayEl.innerHTML = headerHtml + html;
+                }
+            }).catch(() => {
+                // Keep default "no about info" message
+            });
+
+            // Update statistics
+            this.updateAboutStats();
+        },
+
+        async loadAboutInfo() {
+            try {
+                if (this.githubStorage && this.githubStorage.config && this.githubStorage.config.owner) {
+                    try {
+                        const file = await this.githubStorage.getFile('about.json');
+                        if (file && file.content) {
+                            return JSON.parse(file.content);
+                        }
+                    } catch (e) {
+                        console.log('[About] 无法从GitHub加载about.json:', e.message);
+                    }
+                }
+            } catch (e) {
+                console.warn('[About] 加载关于信息失败:', e);
+            }
+            return null;
+        },
+
+        updateAboutStats() {
+            const entries = this.data.entries || [];
+            const characters = entries.filter(e => e.type === 'character').length;
+            const settings = entries.filter(e => e.type === 'non-character').length;
+            let versions = 0;
+            entries.forEach(e => { versions += (e.versions || []).length; });
+
+            const setText = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val;
+            };
+            setText('about-stat-entries', entries.length);
+            setText('about-stat-characters', characters);
+            setText('about-stat-settings', settings);
+            setText('about-stat-versions', versions);
         },
 
         // ==================== 首页 ====================
