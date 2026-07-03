@@ -503,6 +503,7 @@
                         this.setupUI();
                         this.router('home');
                         this.initKeyboardListeners();
+                        this.loadAbout(); // 【修复】无论哪个分支都必须加载 about.json
                         if (cacheAgeMinutes < 60) {
                             this.backgroundRefresh();
                             return;
