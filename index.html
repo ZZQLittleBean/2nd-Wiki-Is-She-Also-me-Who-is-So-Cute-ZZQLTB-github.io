@@ -394,7 +394,8 @@
             about: null,
             previousEntryId: null,
             previousEntryName: null,
-            previousEntryType: null
+            previousEntryType: null,
+            previousEntryChapter: null
         },
         _loaded: false,
         _keyboardHandler: null,
@@ -855,6 +856,11 @@
 
             // 关闭可能打开的tooltip
             this.closeSynopsisTooltip();
+
+            // 【回到xx】回到首页/列表页时清空记录
+            if (['home', 'characters', 'non-characters'].includes(view)) {
+                this._clearPreviousEntry();
+            }
 
             switch (view) {
                 case 'home': this.renderHome(container); break;
@@ -1359,12 +1365,14 @@
             }
             }
 
-            // 【新增】回到'xx'按钮
+            // 【回到xx】显示"回到来源词条"按钮（不显示当前词条自己）
             const backBtnArea = clone.querySelector('.flex.items-center.gap-2');
-            if (backBtnArea && this.data.previousEntryId && this.data.previousEntryName) {
+            if (backBtnArea && this.data.previousEntryId && this.data.previousEntryName && this.data.previousEntryId !== entry.id) {
                 const prevBtn = document.createElement('button');
                 prevBtn.className = 'px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition text-sm flex items-center gap-1.5 border border-indigo-200';
-                prevBtn.innerHTML = `<i class="fa-solid fa-reply"></i> 回到'${this.data.previousEntryName}'`;
+                // 添加首次出现章节标注
+                const chapterLabel = this.data.previousEntryChapter ? ` <span class="text-[10px] text-gray-400 ml-0.5">\u00b7${this.escapeHtml(this.data.previousEntryChapter)}</span>` : '';
+                prevBtn.innerHTML = `<i class="fa-solid fa-reply"></i> 回到'${this.escapeHtml(this.data.previousEntryName)}'${chapterLabel}`;
                 prevBtn.onclick = () => this.goBackToPrevious();
                 const existingBackBtn = backBtnArea.querySelector('button');
                 if (existingBackBtn) existingBackBtn.parentNode.insertBefore(prevBtn, existingBackBtn.nextSibling);
@@ -1460,7 +1468,7 @@
                 if (entry && entry.versions) {
                     const version = entry.versions.find(v => v.vid === cleanVersionId);
                     const actualVid = version ? version.vid : (entry.versions[0]?.vid || '');
-                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${actualVid}')">${cleanDisplayText}</a>`;
+                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${actualVid}'); return false;">${cleanDisplayText}</a>`;
                 }
                 return `<span class="text-red-400" title="词条未找到">[[${cleanDisplayText}]]</span>`;
             });
@@ -1472,7 +1480,7 @@
                 const entry = this.findEntry(cleanId);
                 if (entry && entry.versions && entry.versions.length > 0) {
                     const firstVersion = entry.versions[0];
-                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${firstVersion.vid}')">${cleanDisplayText}</a>`;
+                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${firstVersion.vid}'); return false;">${cleanDisplayText}</a>`;
                 }
                 return `<span class="text-red-400" title="词条未找到">[[${cleanDisplayText}]]</span>`;
             });
@@ -1488,7 +1496,7 @@
                 });
                 if (entry && entry.versions.length > 0) {
                     const firstVersion = entry.versions[0];
-                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${firstVersion.vid}')">${cleanTitle}</a>`;
+                    return `<a href="javascript:void(0)" class="entry-index-link" onclick="app.openEntryWithVersion('${entry.id}', '${firstVersion.vid}'); return false;">${cleanTitle}</a>`;
                 }
                 return `<span class="text-gray-400">[[${cleanTitle}]]</span>`;
             });
@@ -1815,16 +1823,8 @@
         openEntry(entryId, versionId) {
             const entry = this.data.entries.find(e => e.id === entryId);
             if (!entry) return;
-            // 【新增】浏览历史追踪
-            const currentEntry = this.data.editingId ? this.data.entries.find(e => e.id === this.data.editingId) : null;
-            if (currentEntry && currentEntry.id !== entry.id) {
-                if (!(currentEntry.type === 'body' && entry.type === 'body')) {
-                    this.data.previousEntryId = currentEntry.id;
-                    const visVer = this.getVisibleVersion(currentEntry);
-                    this.data.previousEntryName = visVer ? visVer.title : currentEntry.code;
-                    this.data.previousEntryType = currentEntry.type;
-                }
-            }
+            // 【回到xx】记录来源词条（进入新词条前记录当前词条）
+            this._recordPreviousEntry();
             this.data.editingId = entryId;
             if (versionId && entry.versions.some(v => v.vid === versionId)) {
                 this.data.viewingVersionId = versionId;
@@ -2402,12 +2402,13 @@
         openBodyEntry(chapterId) {
             const bodyEntry = this.data.entries.find(e => e.type === 'body' && e.versions[0]?.chapterFrom === chapterId);
             if (!bodyEntry) { this.showToast('该章节暂无正文词条', 'warning'); return; }
+            // 【回到xx】正文词条间跳转（上一章/下一章）清空记录；从非正文词条查看正文则记录
             if (this.data.editingId) {
                 const currentEntry = this.data.entries.find(e => e.id === this.data.editingId);
                 if (currentEntry && currentEntry.type === 'body') {
-                    this.data.previousEntryId = null;
-                    this.data.previousEntryName = null;
-                    this.data.previousEntryType = null;
+                    this._clearPreviousEntry();
+                } else if (currentEntry) {
+                    this._recordPreviousEntry();
                 }
             }
             this.openEntry(bodyEntry.id);
@@ -2425,12 +2426,39 @@
             this.openBodyEntry(sortedChapters[newIdx].id);
         },
 
+        // 【回到xx】记录当前查看的词条作为"来源"（在跳转到新词条前调用）
+        _recordPreviousEntry() {
+            if (this.data.editingId) {
+                const currentEntry = this.data.entries.find(e => e.id === this.data.editingId);
+                if (currentEntry) {
+                    const currentVersion = this.getVisibleVersion(currentEntry);
+                    this.data.previousEntryId = this.data.editingId;
+                    this.data.previousEntryName = currentVersion?.title || currentEntry.code;
+                    this.data.previousEntryType = currentEntry.type;
+                    const chapterFrom = currentVersion?.chapterFrom;
+                    if (chapterFrom) {
+                        const ch = this.data.chapters.find(c => c.id === chapterFrom);
+                        this.data.previousEntryChapter = ch ? this.formatChapterNum(ch.num) : null;
+                    } else {
+                        this.data.previousEntryChapter = null;
+                    }
+                }
+            }
+        },
+
+        // 【回到xx】清空记录
+        _clearPreviousEntry() {
+            this.data.previousEntryId = null;
+            this.data.previousEntryName = null;
+            this.data.previousEntryType = null;
+            this.data.previousEntryChapter = null;
+        },
+
         goBackToPrevious() {
             if (this.data.previousEntryId) {
                 const prevId = this.data.previousEntryId;
-                this.data.previousEntryId = null;
-                this.data.previousEntryName = null;
-                this.data.previousEntryType = null;
+                // 【关键】使用"回到"后清空记录，不保留链式跳转
+                this._clearPreviousEntry();
                 this.openEntry(prevId);
             }
         }
