@@ -1422,7 +1422,10 @@
                         const vStatus = this.getVersionTimeStatus(entry, v);
                         const btn = document.createElement('button');
                         btn.className = `text-xs px-3 py-1 rounded-full border transition ${vStatus === 'current' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`;
-                        btn.innerHTML = `${this.escapeHtml(v.title)} ${vStatus !== 'current' ? `<span class="text-[10px] opacity-70">(${vStatus === 'past' ? '过去' : '未来'})</span>` : ''}`;
+                        // 添加首次出现章节标注，便于区分同名不同版本
+                        const vChapter = v.chapterFrom ? this.data.chapters.find(c => c.id === v.chapterFrom) : null;
+                        const vChapterLabel = vChapter ? `\u00b7${this.formatChapterNum(vChapter.num)}` : '';
+                        btn.innerHTML = `${this.escapeHtml(v.title)} ${vChapterLabel ? `<span class="text-[10px] text-gray-400 ml-0.5">${vChapterLabel}</span>` : ''} ${vStatus !== 'current' ? `<span class="text-[10px] opacity-70">(${vStatus === 'past' ? '过去' : '未来'})</span>` : ''}`;
                         btn.onclick = () => {
                             if (vStatus === 'future') {
                                 const vConfirmKey = `${entry.id}_${v.vid}`;
