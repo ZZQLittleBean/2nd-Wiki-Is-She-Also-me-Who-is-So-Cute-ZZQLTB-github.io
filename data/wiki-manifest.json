@@ -1,0 +1,406 @@
+{
+  "version": "2.5.0",
+  "lastUpdate": 1783095479480,
+  "mappings": {
+    "char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-8i2iofwqf",
+      "versionId": "v-1774026694075-il4fgzpsm",
+      "imageType": "card"
+    },
+    "char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-8i2iofwqf",
+      "versionId": "v-1774026694075-il4fgzpsm",
+      "imageType": "cover"
+    },
+    "char-1774026694075-8i2iofwqf_v-1774459049483_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-8i2iofwqf",
+      "versionId": "v-1774459049483",
+      "imageType": "avatar"
+    },
+    "char-1774026694075-8i2iofwqf_v-1774459049483_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-8i2iofwqf",
+      "versionId": "v-1774459049483",
+      "imageType": "card"
+    },
+    "char-1774026694075-8i2iofwqf_v-1774459049483_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-8i2iofwqf",
+      "versionId": "v-1774459049483",
+      "imageType": "cover"
+    },
+    "char-1774456559847_v-1774456559847_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774456559847",
+      "versionId": "v-1774456559847",
+      "imageType": "avatar"
+    },
+    "char-1774456559847_v-1774456559847_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774456559847",
+      "versionId": "v-1774456559847",
+      "imageType": "card"
+    },
+    "char-1774456559847_v-1774456559847_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774456559847",
+      "versionId": "v-1774456559847",
+      "imageType": "cover"
+    },
+    "char-1774456559847_v-1774456771811_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774456559847",
+      "versionId": "v-1774456771811",
+      "imageType": "avatar"
+    },
+    "char-1774456559847_v-1774456771811_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774456559847",
+      "versionId": "v-1774456771811",
+      "imageType": "card"
+    },
+    "char-1774456559847_v-1774456771811_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774456559847",
+      "versionId": "v-1774456771811",
+      "imageType": "cover"
+    },
+    "char-1774459740637_v-1774459740637_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459740637",
+      "imageType": "avatar"
+    },
+    "char-1774459740637_v-1774459740637_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459740637",
+      "imageType": "card"
+    },
+    "char-1774459740637_v-1774459740637_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459740637",
+      "imageType": "cover"
+    },
+    "char-1774459740637_v-1774459778040_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459778040",
+      "imageType": "avatar"
+    },
+    "char-1774459740637_v-1774459778040_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459778040",
+      "imageType": "card"
+    },
+    "char-1774459740637_v-1774459778040_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459778040",
+      "imageType": "cover"
+    },
+    "char-1774459740637_v-1774459780540_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459780540",
+      "imageType": "avatar"
+    },
+    "char-1774459740637_v-1774459780540_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459780540",
+      "imageType": "card"
+    },
+    "char-1774459740637_v-1774459780540_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774459740637",
+      "versionId": "v-1774459780540",
+      "imageType": "cover"
+    },
+    "body-ch-1774186885948-9q0x2_v-body-1781365250859-zus59_avatar.jpg": {
+      "type": "entry",
+      "entryId": "body-ch-1774186885948-9q0x2",
+      "versionId": "v-body-1781365250859-zus59",
+      "imageType": "avatar"
+    },
+    "body-ch-1774186885948-aaljk_v-body-1781365250859-mixpd_avatar.jpg": {
+      "type": "entry",
+      "entryId": "body-ch-1774186885948-aaljk",
+      "versionId": "v-body-1781365250859-mixpd",
+      "imageType": "avatar"
+    },
+    "char-1774006823382_v-1774006823382_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774006823382",
+      "versionId": "v-1774006823382",
+      "imageType": "avatar"
+    },
+    "char-1774006823382_v-1774006823382_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774006823382",
+      "versionId": "v-1774006823382",
+      "imageType": "card"
+    },
+    "char-1774008119662_v-1774008119662_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774008119662",
+      "imageType": "card"
+    },
+    "char-1774008119662_v-1774008119662_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774008119662",
+      "imageType": "avatar"
+    },
+    "char-1774008119662_v-1774008119662_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774008119662",
+      "imageType": "cover"
+    },
+    "char-1774008119662_v-1774344674149_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344674149",
+      "imageType": "avatar"
+    },
+    "char-1774008119662_v-1774344674149_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344674149",
+      "imageType": "card"
+    },
+    "char-1774008119662_v-1774344674149_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344674149",
+      "imageType": "cover"
+    },
+    "char-1774006823382_v-1774006823382_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774006823382",
+      "versionId": "v-1774006823382",
+      "imageType": "cover.jpg"
+    },
+    "char-1774008119662_v-1774344684185_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344684185",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774008119662_v-1774344684185_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344684185",
+      "imageType": "cover.jpg"
+    },
+    "char-1774008119662_v-1774344686388_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344686388",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774008119662_v-1774344686388_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344686388",
+      "imageType": "card.jpg"
+    },
+    "char-1774008119662_v-1774344684185_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344684185",
+      "imageType": "card.jpg"
+    },
+    "char-1774008119662_v-1774344686388_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774008119662",
+      "versionId": "v-1774344686388",
+      "imageType": "cover.jpg"
+    },
+    "char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-8i2iofwqf",
+      "versionId": "v-1774026694075-il4fgzpsm",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774026694075-u7kq4f8ke_v-1774026694075-q7qxdep80_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-u7kq4f8ke",
+      "versionId": "v-1774026694075-q7qxdep80",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774026694075-u7kq4f8ke_v-1774026694075-q7qxdep80_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-u7kq4f8ke",
+      "versionId": "v-1774026694075-q7qxdep80",
+      "imageType": "card.jpg"
+    },
+    "char-1774026694075-u7kq4f8ke_v-1774026694075-q7qxdep80_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-u7kq4f8ke",
+      "versionId": "v-1774026694075-q7qxdep80",
+      "imageType": "cover.jpg"
+    },
+    "char-1774026694075-wyzxy3xpt_v-1774026694075-pod22im44_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-wyzxy3xpt",
+      "versionId": "v-1774026694075-pod22im44",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774026694075-wyzxy3xpt_v-1774026694075-pod22im44_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-wyzxy3xpt",
+      "versionId": "v-1774026694075-pod22im44",
+      "imageType": "card.jpg"
+    },
+    "char-1774026694075-wyzxy3xpt_v-1774026694075-pod22im44_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-wyzxy3xpt",
+      "versionId": "v-1774026694075-pod22im44",
+      "imageType": "cover.jpg"
+    },
+    "char-1774026694075-xgyqu152f_v-1774026694075-087rwec5e_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-xgyqu152f",
+      "versionId": "v-1774026694075-087rwec5e",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774026694075-xgyqu152f_v-1774026694075-087rwec5e_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-xgyqu152f",
+      "versionId": "v-1774026694075-087rwec5e",
+      "imageType": "cover.jpg"
+    },
+    "char-1774026694075-xgyqu152f_v-1774026694075-087rwec5e_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774026694075-xgyqu152f",
+      "versionId": "v-1774026694075-087rwec5e",
+      "imageType": "card.jpg"
+    },
+    "char-1774458852650_v-1774458852650_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-1774458852650",
+      "versionId": "v-1774458852650",
+      "imageType": "avatar.jpg"
+    },
+    "char-1774458852650_v-1774458852650_card.jpg": {
+      "type": "entry",
+      "entryId": "char-1774458852650",
+      "versionId": "v-1774458852650",
+      "imageType": "card.jpg"
+    },
+    "char-1774458852650_v-1774458852650_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-1774458852650",
+      "versionId": "v-1774458852650",
+      "imageType": "cover.jpg"
+    },
+    "char-protagonist_v-default_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-protagonist",
+      "versionId": "v-default",
+      "imageType": "avatar.jpg"
+    },
+    "char-protagonist_v-default_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-protagonist",
+      "versionId": "v-default",
+      "imageType": "cover.jpg"
+    },
+    "char-protagonist_v-default_card.jpg": {
+      "type": "entry",
+      "entryId": "char-protagonist",
+      "versionId": "v-default",
+      "imageType": "card.jpg"
+    },
+    "char-xiaoli_v-1774543291292_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-1774543291292",
+      "imageType": "avatar.jpg"
+    },
+    "char-xiaoli_v-1774543291292_card.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-1774543291292",
+      "imageType": "card.jpg"
+    },
+    "char-xiaoli_v-1774543545298_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-1774543545298",
+      "imageType": "avatar.jpg"
+    },
+    "char-xiaoli_v-1774543291292_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-1774543291292",
+      "imageType": "cover.jpg"
+    },
+    "char-xiaoli_v-1774543545298_card.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-1774543545298",
+      "imageType": "card.jpg"
+    },
+    "char-xiaoli_v-4_avatar.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-4",
+      "imageType": "avatar.jpg"
+    },
+    "char-xiaoli_v-1774543545298_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-1774543545298",
+      "imageType": "cover.jpg"
+    },
+    "char-xiaoli_v-4_cover.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-4",
+      "imageType": "cover.jpg"
+    },
+    "non-1776065054851_v-1776065054851_avatar.jpg": {
+      "type": "entry",
+      "entryId": "non-1776065054851",
+      "versionId": "v-1776065054851",
+      "imageType": "avatar.jpg"
+    },
+    "char-xiaoli_v-4_card.jpg": {
+      "type": "entry",
+      "entryId": "char-xiaoli",
+      "versionId": "v-4",
+      "imageType": "card.jpg"
+    },
+    "non-1776065054851_v-1776065054851_cover.jpg": {
+      "type": "entry",
+      "entryId": "non-1776065054851",
+      "versionId": "v-1776065054851",
+      "imageType": "cover.jpg"
+    },
+    "non-1776065054851_v-1776065054851_card.jpg": {
+      "type": "entry",
+      "entryId": "non-1776065054851",
+      "versionId": "v-1776065054851",
+      "imageType": "card.jpg"
+    },
+    "synopsis_syn-1774191539580-57m1e_cover.jpg": {
+      "type": "synopsis",
+      "chapterId": "syn-1774191539580-57m1e"
+    },
+    "synopsis_syn-1774191539580-db6jt_cover.jpg": {
+      "type": "synopsis",
+      "chapterId": "syn-1774191539580-db6jt"
+    }
+  },
+  "appName": "NovelWiki",
+  "exportTime": 1783095479480
+}
