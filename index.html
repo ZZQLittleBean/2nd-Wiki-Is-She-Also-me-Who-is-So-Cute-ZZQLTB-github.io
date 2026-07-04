@@ -2519,6 +2519,10 @@
             if (imgRef.startsWith('{{IMG:')) { const m = imgRef.match(/\{\{IMG:(.+?)\}\}/); if (m && m[1]) return './data/wiki-images/' + m[1]; }
             return imgRef;
         },
+        _renderInlineImages(text) {
+            if (!text) return '';
+            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => '<img src="./data/wiki-images/' + filename + '" style="max-width:100%;border-radius:8px;margin:8px 0;" onerror="this.style.display=\'none\'"/>');
+        },
         _getCurrentEntryExportData() {
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
             if (!entry) return null;
@@ -2558,16 +2562,19 @@
             if (entry.type === 'character' && relChars.length > 0) {
                 relChars.forEach(rc => {
                     const re = this.data.entries.find(e => e.id === rc.charId);
-                    if (re) {
-                        const rv = re.versions ? re.versions[0] : null;
-                        relations.push({ name: rv ? rv.title : re.code, relationName: rc.relationName || '相关', code: re.code });
-                    }
+                    if (re) { const rv = re.versions ? re.versions[0] : null; relations.push({ name: rv ? rv.title : re.code, relationName: rc.relationName || '相关', code: re.code }); }
                 });
             }
-            let synopsis = null;
+            let synopsis = null, synopsisHtml = '';
             if (entry.type === 'body') {
-                const bs = this.data.synopsis ? this.data.synopsis.find(s => s.entryId === entry.id) : null;
-                if (bs && bs.content) synopsis = this._stripIndexLinks(this.stripHtml(bs.content));
+                const chapterId = version.chapterFrom;
+                const bs = chapterId && this.data.synopsis ? this.data.synopsis.find(s => s.chapterId === chapterId) : null;
+                if (bs && bs.content) {
+                    synopsis = this._stripIndexLinks(this.stripHtml(bs.content));
+                    let rendered = this.escapeHtml(synopsis);
+                    rendered = this._renderInlineImages(rendered);
+                    synopsisHtml = rendered.replace(/\n/g, '<br>');
+                }
             }
             let contentText = '', contentMarkdown = '', contentHtml = '';
             let coverImage = '';
@@ -2579,35 +2586,19 @@
                     const raw = block.text || '';
                     const plain = this._stripIndexLinks(raw);
                     const safe = this.escapeHtml(plain);
-                    if (block.type === 'h2') {
-                        contentText += plain + '\n\n'; contentMarkdown += '## ' + plain + '\n\n';
-                        contentHtml += '<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:28px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">' + safe + '</h2>';
-                    } else if (block.type === 'h3') {
-                        contentText += plain + '\n\n'; contentMarkdown += '### ' + plain + '\n\n';
-                        contentHtml += '<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:18px 0 8px;">' + safe + '</h3>';
-                    } else if (block.type === 'p') {
-                        contentText += plain + '\n\n'; contentMarkdown += plain + '\n\n';
-                        let rendered = this.parseInlineMarkdown ? this.parseInlineMarkdown(plain) : safe;
-                        contentHtml += '<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:10px 0;text-align:justify;">' + rendered + '</p>';
-                    } else if (block.type === 'image') {
-                        const imgUrl = this._resolveImageUrl(block.src || '');
-                        if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>';
-                    }
+                    if (block.type === 'h2') { contentText += plain + '\n\n'; contentMarkdown += '## ' + plain + '\n\n'; contentHtml += '<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:28px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">' + safe + '</h2>'; }
+                    else if (block.type === 'h3') { contentText += plain + '\n\n'; contentMarkdown += '### ' + plain + '\n\n'; contentHtml += '<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:18px 0 8px;">' + safe + '</h3>'; }
+                    else if (block.type === 'p') { contentText += plain + '\n\n'; contentMarkdown += plain + '\n\n'; let rendered = this.parseInlineMarkdown ? this.parseInlineMarkdown(plain) : safe; contentHtml += '<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:10px 0;text-align:justify;">' + rendered + '</p>'; }
+                    else if (block.type === 'image') { const imgUrl = this._resolveImageUrl(block.src || ''); if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>'; }
                 });
             }
             const mark = this.data.settings?.exportMark;
             let markText = '', markMarkdown = '', markHtml = '';
             if (mark && mark.enabled) {
-                if (mark.text) {
-                    markText = '\n---\n' + mark.text; markMarkdown = '\n\n---\n\n' + mark.text;
-                    markHtml += '<div style="margin-top:24px;padding-top:16px;border-top:2px solid #e5e7eb;color:#6b7280;font-size:13px;">' + this.escapeHtml(mark.text).replace(/\n/g, '<br>') + '</div>';
-                }
-                if (mark.image) {
-                    const miu = this._resolveImageUrl(mark.image);
-                    markHtml += '<div style="margin-top:12px;text-align:center;"><img src="' + miu + '" style="max-width:200px;max-height:80px;border-radius:4px;" onerror="this.style.display=\'none\'"/></div>';
-                }
+                if (mark.text) { markText = '\n---\n' + mark.text; markMarkdown = '\n\n---\n\n' + mark.text; markHtml += '<div style="margin-top:24px;padding-top:16px;border-top:2px solid #e5e7eb;color:#6b7280;font-size:13px;">' + this.escapeHtml(mark.text).replace(/\n/g, '<br>') + '</div>'; }
+                if (mark.image) { const miu = this._resolveImageUrl(mark.image); markHtml += '<div style="margin-top:12px;text-align:center;"><img src="' + miu + '" style="max-width:200px;max-height:80px;border-radius:4px;" onerror="this.style.display=\'none\'"/></div>'; }
             }
-            return { entry, version, typeLabel, chapterRange, allVersions, relations, synopsis, contentText, contentMarkdown, contentHtml, coverImage, markText, markMarkdown, markHtml, mark };
+            return { entry, version, typeLabel, chapterRange, allVersions, relations, synopsis, synopsisHtml, contentText, contentMarkdown, contentHtml, coverImage, markText, markMarkdown, markHtml, mark };
         },
         exportEntryAsTxt() {
             const d = this._getCurrentEntryExportData();
@@ -2652,41 +2643,33 @@
             this.showToast('Markdown导出成功', 'success'); this.closeShareDialog();
         },
         async exportEntryAsImage() {
-            if (typeof html2canvas === 'undefined') {
-                this.showToast('正在加载图片导出库...', 'info');
-                try { await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); }
-                catch (e) { this.showToast('图片导出库加载失败', 'error'); return; }
-            }
+            if (typeof html2canvas === 'undefined') { this.showToast('正在加载图片导出库...', 'info'); try { await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); } catch (e) { this.showToast('图片导出库加载失败', 'error'); return; } }
             const d = this._getCurrentEntryExportData();
             if (!d) return;
             const container = document.createElement('div');
             container.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#ffffff;padding:48px;font-family:"Noto Sans SC","Microsoft YaHei",sans-serif;z-index:-1;';
-            let coverHtml = '';
-            if (d.coverImage) { coverHtml = '<div style="text-align:center;margin-bottom:24px;"><img src="' + d.coverImage + '" style="max-width:360px;max-height:240px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);object-fit:cover;" onerror="this.style.display=\'none\'"/></div>'; }
+            let headerFlex = '';
+            if (d.coverImage) {
+                headerFlex = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:8px;padding-bottom:24px;border-bottom:3px solid #4f46e5;"><div style="flex:1;min-width:0;"><div style="display:inline-block;padding:4px 14px;background:#4f46e5;color:#fff;font-size:12px;border-radius:12px;margin-bottom:12px;">' + this.escapeHtml(d.typeLabel) + '</div><h1 style="font-size:30px;font-weight:bold;color:#1f2937;margin:0 0 8px;line-height:1.3;">' + this.escapeHtml(d.version.title) + '</h1><div style="font-size:13px;color:#6b7280;font-family:monospace;">' + d.entry.code + (d.chapterRange ? ' · 第' + this.escapeHtml(d.chapterRange) + '章' : '') + '</div></div><div style="flex-shrink:0;"><img src="' + d.coverImage + '" style="width:200px;height:280px;object-fit:cover;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);" onerror="this.style.display=\'none\'"/></div></div>';
+            } else {
+                headerFlex = '<div style="text-align:center;margin-bottom:8px;padding-bottom:24px;border-bottom:3px solid #4f46e5;"><div style="display:inline-block;padding:4px 14px;background:#4f46e5;color:#fff;font-size:12px;border-radius:12px;margin-bottom:12px;">' + this.escapeHtml(d.typeLabel) + '</div><h1 style="font-size:30px;font-weight:bold;color:#1f2937;margin:0 0 8px;line-height:1.3;">' + this.escapeHtml(d.version.title) + '</h1><div style="font-size:13px;color:#6b7280;font-family:monospace;">' + d.entry.code + (d.chapterRange ? ' · 第' + this.escapeHtml(d.chapterRange) + '章' : '') + '</div></div>';
+            }
             let extra = '';
             if (d.allVersions.length > 0) { let vh = '<div style="margin:20px 0;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;"><div style="font-size:13px;font-weight:bold;color:#475569;margin-bottom:10px;">📋 版本</div>'; d.allVersions.forEach(v => { vh += '<div style="font-size:14px;color:#334155;padding:4px 0;">' + (v.isCurrent ? '<span style="color:#4f46e5;font-weight:bold;">▶</span> ' : '<span style="color:#94a3b8;">○</span> ') + this.escapeHtml(v.title) + (v.range ? ' <span style="color:#94a3b8;font-size:12px;">(' + this.escapeHtml(v.range) + ')</span>' : '') + '</div>'; }); vh += '</div>'; extra += vh; }
             if (d.relations.length > 0) { let rh = '<div style="margin:20px 0;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;"><div style="font-size:13px;font-weight:bold;color:#166534;margin-bottom:10px;">🔗 关系</div><div style="display:flex;flex-wrap:wrap;gap:8px;">'; d.relations.forEach(r => { rh += '<span style="display:inline-block;padding:6px 12px;background:#dcfce7;border-radius:20px;font-size:13px;color:#15803d;">' + this.escapeHtml(r.name) + '<span style="color:#86efac;margin:0 4px;">·</span>' + this.escapeHtml(r.relationName) + '</span>'; }); rh += '</div></div>'; extra += rh; }
-            if (d.synopsis) { extra += '<div style="margin:20px 0;padding:16px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;"><div style="font-size:13px;font-weight:bold;color:#92400e;margin-bottom:10px;">📖 剧情梗概</div><div style="font-size:14px;color:#78350f;line-height:1.8;">' + this.escapeHtml(d.synopsis).replace(/\n/g, '<br>') + '</div></div>'; }
+            if (d.synopsisHtml) { extra += '<div style="margin:20px 0;padding:16px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;"><div style="font-size:13px;font-weight:bold;color:#92400e;margin-bottom:10px;">📖 剧情梗概</div><div style="font-size:14px;color:#78350f;line-height:1.8;">' + d.synopsisHtml + '</div></div>'; }
             let subH = '';
             if (d.version.subtitle) { subH = '<div style="margin:20px 0;padding:16px 20px;border-left:4px solid #4f46e5;background:#eef2ff;border-radius:0 8px 8px 0;font-size:15px;color:#4338ca;font-style:italic;line-height:1.8;">' + (this.parseInlineMarkdown ? this.parseInlineMarkdown(this.stripHtml(d.version.subtitle)) : this.escapeHtml(this.stripHtml(d.version.subtitle))) + '</div>'; }
-            container.innerHTML = '<div style="max-width:720px;margin:0 auto;"><div style="text-align:center;margin-bottom:8px;padding-bottom:24px;border-bottom:3px solid #4f46e5;"><div style="display:inline-block;padding:4px 14px;background:#4f46e5;color:#fff;font-size:12px;border-radius:12px;margin-bottom:12px;">' + this.escapeHtml(d.typeLabel) + '</div><h1 style="font-size:30px;font-weight:bold;color:#1f2937;margin:0 0 8px;line-height:1.3;">' + this.escapeHtml(d.version.title) + '</h1><div style="font-size:13px;color:#6b7280;font-family:monospace;">' + d.entry.code + (d.chapterRange ? ' · 第' + this.escapeHtml(d.chapterRange) + '章' : '') + '</div></div>' + coverHtml + extra + subH + '<div style="margin-top:24px;">' + d.contentHtml + '</div>' + d.markHtml + '<div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">导自 ' + this.escapeHtml(this.data.settings?.name || 'Wiki') + '</div></div>';
+            container.innerHTML = '<div style="max-width:720px;margin:0 auto;">' + headerFlex + extra + subH + '<div style="margin-top:24px;">' + d.contentHtml + '</div>' + d.markHtml + '<div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">导自 ' + this.escapeHtml(this.data.settings?.name || 'Wiki') + '</div></div>';
             document.body.appendChild(container);
-            try { const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: 800, height: container.scrollHeight, logging: false }); const url = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = d.version.title + '_' + d.entry.code + '.png'; a.click(); this.showToast('图片导出成功', 'success'); }
-            catch (e) { console.error('图片导出失败:', e); this.showToast('图片导出失败', 'error'); }
-            finally { container.remove(); }
+            await new Promise(r => setTimeout(r, 300));
+            await Promise.all(Array.from(container.querySelectorAll('img')).map(img => new Promise(r => { if (img.complete) r(); else { img.onload = r; img.onerror = r; } })));
+            try { const canvas = await html2canvas(container, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff', logging: false }); const url = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = d.version.title + '_' + d.entry.code + '.png'; a.click(); this.showToast('图片导出成功', 'success'); } catch (e) { console.error('图片导出失败:', e); this.showToast('图片导出失败', 'error'); } finally { container.remove(); }
             this.closeShareDialog();
         },
-        _loadScript(src) {
-            return new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
-        },
-        updateExportMarkEnabled(enabled) {
-            if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' };
-            this.data.settings.exportMark.enabled = enabled;
-        },
-        updateExportMarkText(text) {
-            if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' };
-            this.data.settings.exportMark.text = text;
-        },
+        _loadScript(src) { return new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); }); },
+        updateExportMarkEnabled(enabled) { if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' }; this.data.settings.exportMark.enabled = enabled; },
+        updateExportMarkText(text) { if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' }; this.data.settings.exportMark.text = text; },
 
         // ==================== 键盘导航 ====================
         initKeyboardListeners() {
