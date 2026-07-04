@@ -283,6 +283,9 @@
                     <div class="flex gap-2 items-center">
                         <span id="detail-code" class="entry-code"></span>
                         <span id="detail-version-badge" class="hidden px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">版本: <span id="detail-version-name">默认</span></span>
+                        <button onclick="app.shareCurrentEntry()" class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-sm hover:bg-emerald-100 transition" title="分享/导出">
+                            <i class="fa-solid fa-share-nodes"></i> <span class="hidden sm:inline">分享</span>
+                        </button>
                     </div>
                 </div>
                 <div id="detail-content" class="prose prose-sm max-w-none"></div>
@@ -371,7 +374,52 @@
         </div>
     </template>
 
-
+    <!-- 词条分享弹窗模板 -->
+    <template id="tpl-share-dialog">
+        <div class="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 fade-in" onclick="if(event.target === this) app.closeShareDialog()">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+                <div class="p-4 border-b bg-gradient-to-r from-emerald-50 to-teal-50 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-share-nodes text-emerald-600"></i>
+                        <h3 class="font-bold text-gray-800">分享词条</h3>
+                    </div>
+                    <button onclick="app.closeShareDialog()" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="text-sm text-gray-500 mb-2">选择导出格式：</div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="app.exportEntryAsImage()" class="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-emerald-50 rounded-xl border border-gray-200 hover:border-emerald-300 transition group">
+                            <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-image"></i>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700">图片</span>
+                            <span class="text-[10px] text-gray-400">导出为PNG</span>
+                        </button>
+                        <button onclick="app.exportEntryAsTxt()" class="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-200 hover:border-blue-300 transition group">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-file-lines"></i>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700">文本</span>
+                            <span class="text-[10px] text-gray-400">导出为TXT</span>
+                        </button>
+                        <button onclick="app.exportEntryAsMarkdown()" class="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-purple-50 rounded-xl border border-gray-200 hover:border-purple-300 transition group">
+                            <div class="w-12 h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-brands fa-markdown"></i>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700">Markdown</span>
+                            <span class="text-[10px] text-gray-400">导出为MD</span>
+                        </button>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                        <i class="fa-solid fa-circle-info mr-1"></i>
+                        导出内容末尾将包含管理员设置的标记信息（如有设置）
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 
     <!-- ========== JavaScript ========== -->
     <script>
@@ -379,7 +427,7 @@
     const app = {
         // 数据存储结构（与本地版兼容）
         data: {
-            settings: { name: '未命名 Wiki', subtitle: '', welcomeTitle: '欢迎来到 Wiki', welcomeSubtitle: '探索角色、世界观与错综复杂的关系网。', customFont: null, homeCustomTitle: '首页自定义内容' },
+            settings: { name: '未命名 Wiki', subtitle: '', welcomeTitle: '欢迎来到 Wiki', welcomeSubtitle: '探索角色、世界观与错综复杂的关系网。', customFont: null, homeCustomTitle: '首页自定义内容', exportMark: { enabled: false, text: '' } },
             entries: [],
             camps: [],
             chapters: [],
@@ -910,6 +958,11 @@
             if (selector) {
                 selector.innerHTML = '';
                 if (this.data.chapters && this.data.chapters.length > 0) {
+                    // 【修复】重新添加"最新进度"选项，避免被清空后丢失
+                    const latestOpt = document.createElement('option');
+                    latestOpt.value = 'latest';
+                    latestOpt.textContent = '最新进度 (全部内容)';
+                    selector.appendChild(latestOpt);
                     const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
                     sortedChapters.forEach(ch => {
                         const opt = document.createElement('option');
@@ -2027,6 +2080,7 @@
             const clone = tpl.content.cloneNode(true);
             container.appendChild(clone);
             this.initDraggablePanel();
+            this.initGraphPan();
             setTimeout(() => this.renderGraphNodes(), 50);
         },
 
@@ -2039,6 +2093,46 @@
             handle.addEventListener('mousedown', (e) => { isDragging = true; panel.classList.add('dragging'); startX = e.clientX; startY = e.clientY; const rect = panel.getBoundingClientRect(); initialX = rect.left; initialY = rect.top; e.preventDefault(); });
             document.addEventListener('mousemove', (e) => { if (!isDragging) return; const dx = e.clientX - startX; const dy = e.clientY - startY; panel.style.left = `${initialX + dx}px`; panel.style.top = `${initialY + dy}px`; panel.style.right = 'auto'; });
             document.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; panel.classList.remove('dragging'); } });
+        },
+
+        // 【修复】从本地版同步：添加图谱画布拖拽/平移功能
+        initGraphPan() {
+            const container = document.getElementById('graph-container');
+            if (!container) return;
+            let isPanning = false, startX, startY;
+            container.addEventListener('mousedown', (e) => {
+                if (e.target.id === 'graph-container' || e.target.id === 'graph-svg' || e.target.id === 'graph-nodes') {
+                    isPanning = true;
+                    startX = e.clientX - (this.data.graphState.translateX || 0);
+                    startY = e.clientY - (this.data.graphState.translateY || 0);
+                    container.style.cursor = 'grabbing';
+                    e.preventDefault();
+                }
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+                this.data.graphState.translateX = e.clientX - startX;
+                this.data.graphState.translateY = e.clientY - startY;
+                this.applyGraphTransform();
+            });
+            document.addEventListener('mouseup', () => {
+                if (isPanning) { isPanning = false; container.style.cursor = 'grab'; }
+            });
+            // Touch support for mobile
+            container.addEventListener('touchstart', (e) => {
+                if (e.target.id === 'graph-container' || e.target.id === 'graph-svg' || e.target.id === 'graph-nodes') {
+                    isPanning = true;
+                    startX = e.touches[0].clientX - (this.data.graphState.translateX || 0);
+                    startY = e.touches[0].clientY - (this.data.graphState.translateY || 0);
+                }
+            }, { passive: true });
+            document.addEventListener('touchmove', (e) => {
+                if (!isPanning) return;
+                this.data.graphState.translateX = e.touches[0].clientX - startX;
+                this.data.graphState.translateY = e.touches[0].clientY - startY;
+                this.applyGraphTransform();
+            }, { passive: true });
+            document.addEventListener('touchend', () => { isPanning = false; });
         },
 
         togglePanelCollapse() {
@@ -2368,6 +2462,111 @@
             if (this.tooltipHoverTimeout) { clearTimeout(this.tooltipHoverTimeout); this.tooltipHoverTimeout = null; }
             if (this.currentTooltipChapterId === chapterId) { this.closeSynopsisTooltip(); this.router('synopsis'); const idx = this.data.synopsis.findIndex(s => s.id === chapterId); if (idx !== -1) { this.data.synopsisViewIndex = idx; setTimeout(() => this.setSynopsisActiveIndex(idx), 100); } }
             else this.showSynopsisTooltip(chapterId, element);
+        },
+
+        // ========== 词条分享与导出 ==========
+        shareCurrentEntry() {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            if (!entry) { this.showToast('未找到当前词条', 'error'); return; }
+            const tpl = document.getElementById('tpl-share-dialog');
+            if (!tpl) { this.showToast('分享模板未找到', 'error'); return; }
+            this.closeShareDialog();
+            const clone = tpl.content.cloneNode(true);
+            document.body.appendChild(clone);
+        },
+        closeShareDialog() {
+            document.querySelectorAll('.fixed.inset-0.bg-black\/50.z-\[9999\]').forEach(el => {
+                if (el.querySelector('.fa-share-nodes')) el.remove();
+            });
+        },
+        _getCurrentEntryExportData() {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            if (!entry) return null;
+            const version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || this.getVisibleVersion(entry) || entry.versions[entry.versions.length - 1];
+            if (!version) return null;
+            let contentText = '', contentMarkdown = '';
+            if (version.content && version.content.blocks) {
+                version.content.blocks.forEach(block => {
+                    const text = this.stripHtml(block.text || '');
+                    if (block.type === 'h2') { contentText += text + '\n\n'; contentMarkdown += '## ' + text + '\n\n'; }
+                    else if (block.type === 'h3') { contentText += text + '\n\n'; contentMarkdown += '### ' + text + '\n\n'; }
+                    else { contentText += text + '\n\n'; contentMarkdown += text + '\n\n'; }
+                });
+            }
+            const mark = this.data.settings?.exportMark;
+            let markText = '', markMarkdown = '';
+            if (mark && mark.enabled) {
+                if (mark.text) { markText = '\n---\n' + mark.text; markMarkdown = '\n\n---\n\n' + mark.text; }
+            }
+            return { entry, version, contentText, contentMarkdown, markText, markMarkdown, mark };
+        },
+        exportEntryAsTxt() {
+            const data = this._getCurrentEntryExportData();
+            if (!data) return;
+            let txt = `${data.version.title}\n编号: ${data.entry.code}\n`;
+            if (data.version.subtitle) txt += `题记: ${this.stripHtml(data.version.subtitle)}\n`;
+            txt += `\n${data.contentText}${data.markText}`;
+            const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${data.version.title}_${data.entry.code}.txt`; a.click(); URL.revokeObjectURL(url);
+            this.showToast('TXT导出成功', 'success'); this.closeShareDialog();
+        },
+        exportEntryAsMarkdown() {
+            const data = this._getCurrentEntryExportData();
+            if (!data) return;
+            let md = `# ${data.version.title}\n\n> **编号**: ${data.entry.code}\n`;
+            if (data.version.subtitle) md += `> **题记**: ${this.stripHtml(data.version.subtitle)}\n`;
+            md += `\n${data.contentMarkdown}${data.markMarkdown}`;
+            const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${data.version.title}_${data.entry.code}.md`; a.click(); URL.revokeObjectURL(url);
+            this.showToast('Markdown导出成功', 'success'); this.closeShareDialog();
+        },
+        async exportEntryAsImage() {
+            if (typeof html2canvas === 'undefined') {
+                this.showToast('正在加载图片导出库...', 'info');
+                try { await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); }
+                catch (e) { this.showToast('图片导出库加载失败', 'error'); return; }
+            }
+            const data = this._getCurrentEntryExportData();
+            if (!data) return;
+            const { entry, version, mark } = data;
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:white;padding:40px;font-family:sans-serif;z-index:-1;';
+            let markHtml = '';
+            if (mark && mark.enabled && mark.text) {
+                markHtml = `<div style="margin-top:20px;padding-top:20px;border-top:2px solid #e5e7eb;color:#6b7280;font-size:14px;">${this.escapeHtml(mark.text).replace(/\n/g,'<br>')}</div>`;
+            }
+            let blocksHtml = '';
+            if (version.content && version.content.blocks) {
+                version.content.blocks.forEach(block => {
+                    const text = this.escapeHtml(this.stripHtml(block.text || ''));
+                    if (block.type === 'h2') blocksHtml += `<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:20px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">${text}</h2>`;
+                    else if (block.type === 'h3') blocksHtml += `<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:16px 0 8px;">${text}</h3>`;
+                    else blocksHtml += `<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:8px 0;">${this.parseContentText(block.text || '')}</p>`;
+                });
+            }
+            container.innerHTML = `<div style="max-width:720px;margin:0 auto;"><div style="text-align:center;margin-bottom:24px;padding-bottom:20px;border-bottom:3px solid #4f46e5;"><h1 style="font-size:28px;font-weight:bold;color:#1f2937;margin:0 0 8px;">${this.escapeHtml(version.title)}</h1><div style="font-size:13px;color:#6b7280;font-family:monospace;">${entry.code}</div>${version.subtitle ? `<div style="font-size:15px;color:#6b7280;font-style:italic;margin-top:8px;">${this.escapeHtml(this.stripHtml(version.subtitle))}</div>` : ''}</div><div style="color:#374151;">${blocksHtml}</div>${markHtml}<div style="margin-top:30px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">导出自 ${this.escapeHtml(this.data.settings.name || 'Wiki')}</div></div>`;
+            document.body.appendChild(container);
+            try {
+                const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: 800, height: container.scrollHeight });
+                const url = canvas.toDataURL('image/png');
+                const a = document.createElement('a'); a.href = url; a.download = `${version.title}_${entry.code}.png`; a.click();
+                this.showToast('图片导出成功', 'success');
+            } catch (e) { console.error('图片导出失败:', e); this.showToast('图片导出失败', 'error'); }
+            finally { container.remove(); }
+            this.closeShareDialog();
+        },
+        _loadScript(src) {
+            return new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
+        },
+        updateExportMarkEnabled(enabled) {
+            if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' };
+            this.data.settings.exportMark.enabled = enabled;
+        },
+        updateExportMarkText(text) {
+            if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' };
+            this.data.settings.exportMark.text = text;
         },
 
         // ==================== 键盘导航 ====================
