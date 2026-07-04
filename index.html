@@ -398,7 +398,8 @@
             previousEntryId: null,
             previousEntryName: null,
             previousEntryType: null,
-            previousEntryChapter: null
+            previousEntryChapter: null,
+            previousVersionId: null
         },
         _loaded: false,
         _keyboardHandler: null,
@@ -409,18 +410,37 @@
         confirmedFutureEntries: new Set(),
 
         // ==================== IndexedDB 缓存层 ====================
+        // 【性能优化】复用 IndexedDB 连接，避免每次操作都重新打开（iOS Safari 尤其慢）
+        _cacheDB: null,
+        _cacheDBPromise: null,
+
         async openCacheDB() {
-            return new Promise((resolve, reject) => {
+            // 如果已有打开中的 Promise，等待它完成
+            if (this._cacheDBPromise) return this._cacheDBPromise;
+            // 如果已有连接且未关闭，直接复用
+            if (this._cacheDB) return this._cacheDB;
+
+            this._cacheDBPromise = new Promise((resolve, reject) => {
                 const req = indexedDB.open('WikiCache', 1);
-                req.onerror = () => reject(req.error);
+                req.onerror = () => {
+                    this._cacheDBPromise = null;
+                    reject(req.error);
+                };
                 req.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('data')) {
                         db.createObjectStore('data');
                     }
                 };
-                req.onsuccess = () => resolve(req.result);
+                req.onsuccess = () => {
+                    this._cacheDB = req.result;
+                    // 监听连接意外关闭（如浏览器清理时）
+                    this._cacheDB.onclose = () => { this._cacheDB = null; };
+                    this._cacheDBPromise = null;
+                    resolve(this._cacheDB);
+                };
             });
+            return this._cacheDBPromise;
         },
 
         async cacheGet(key) {
@@ -481,44 +501,47 @@
         },
 
         // ==================== 初始化 ====================
+        // 【性能优化】重写init，消除重复操作，统一加载完成逻辑
         async init() {
-            window.__WIKI_VERSION__ = 'v2-fix5';
+            window.__WIKI_VERSION__ = 'v2-fix6-opt';
             console.log('[Wiki] 版本:', window.__WIKI_VERSION__);
             console.log('[Wiki] 页面URL:', window.location.href);
 
+            const perfStart = performance.now();
             let cacheLoaded = false;
+
+            // ===== 阶段1：尝试从缓存加载（快速路径）=====
             try {
                 const cachedData = await this.cacheGet('data');
                 const cacheTime = await this.cacheGet('time');
-                if (cachedData) {
+                if (cachedData && this.validateData(cachedData).valid) {
                     const cacheAge = cacheTime ? (Date.now() - parseInt(cacheTime)) : Infinity;
                     const cacheAgeMinutes = Math.round(cacheAge / 60000);
-                    console.log('[Wiki] 发现缓存，年龄:', cacheAgeMinutes, '分钟');
-                    if (this.validateData(cachedData).valid) {
-                        Object.assign(this.data, cachedData);
-                        this._loaded = true;
-                        cacheLoaded = true;
-                        console.log('[Wiki] 已从缓存加载，条目数:', this.data.entries.length);
-                        // 【新增】同步正文词条与章节
-                        if (this.data.chapters && this.data.chapters.length > 0) {
-                            this.syncBodyEntriesWithChapters();
-                        }
-                        this.hideLoadingState();
-                        this.setupUI();
-                        this.router('home');
-                        this.initKeyboardListeners();
-                        this.loadAbout(); // 【修复】无论哪个分支都必须加载 about.json
-                        if (cacheAgeMinutes < 60) {
-                            this.backgroundRefresh();
-                            return;
-                        }
-                        this.showLoadingState('正在检查更新...');
+                    console.log('[Wiki] 缓存有效，年龄:', cacheAgeMinutes, '分钟，条目数:', cachedData.entries?.length || 0);
+
+                    this.data = { ...this.data, ...cachedData };
+                    this._loaded = true;
+                    cacheLoaded = true;
+
+                    // 首次渲染（缓存数据立即可见）
+                    this._finishLoading();
+
+                    // 缓存新鲜（<60分钟）→ 后台静默检查更新后直接返回
+                    if (cacheAgeMinutes < 60) {
+                        console.log('[Wiki] 缓存新鲜，后台检查更新...');
+                        this._deferredLoad();
+                        this.backgroundRefresh();
+                        return;
                     }
+
+                    // 缓存较旧 → 显示检查更新提示，继续走网络
+                    this.showLoadingState('正在检查更新...');
                 }
             } catch (e) {
                 console.log('[Wiki] 缓存读取失败:', e.message);
             }
 
+            // ===== 阶段2：从网络加载（缓存无效或较旧时）=====
             if (!cacheLoaded) {
                 this.showLoadingState('正在加载 Wiki 数据...');
             }
@@ -528,36 +551,36 @@
 
             if (loadedData) {
                 const validation = this.validateData(loadedData);
-                if (!validation.valid) {
-                    if (!cacheLoaded) {
-                        this.showLoadError('数据格式错误: ' + validation.error);
-                        this._loaded = false;
-                    }
-                } else {
-                    Object.assign(this.data, loadedData);
+                if (validation.valid) {
+                    const entryCount = loadedData.entries?.length || 0;
+                    const oldCount = this.data.entries?.length || 0;
+                    const hasNewData = entryCount !== oldCount;
+
+                    this.data = { ...this.data, ...loadedData };
                     this._loaded = true;
-                    try {
-                        await this.cacheSet('data', loadedData);
-                        await this.cacheSet('time', Date.now());
-                        console.log('[Wiki] 数据已缓存');
-                    } catch (e) {
-                        console.log('[Wiki] 缓存保存失败:', e.message);
-                    }
-                    if (this.data.settings.customFont) {
-                        document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
-                    }
+
+                    // 使用 requestIdleCallback 延迟写入 IndexedDB（iOS Safari 写入慢）
+                    this._deferCacheWrite(loadedData);
+
                     if (cacheLoaded) {
-                        // 【新增】同步正文词条与章节
-                        if (this.data.chapters && this.data.chapters.length > 0) {
-                            this.syncBodyEntriesWithChapters();
+                        // 已有缓存渲染 → 只有数据变化时才重新渲染
+                        if (hasNewData) {
+                            console.log('[Wiki] 数据变化:', oldCount, '->', entryCount);
+                            this._finishLoading();
+                            this.showToast('已更新到最新数据', 'success', 2000);
+                        } else {
+                            console.log('[Wiki] 数据无变化');
                         }
-                        this.setupUI();
-                        this.router('home');
-                        this.showToast('已更新到最新数据', 'success', 2000);
+                    } else {
+                        // 无缓存 → 首次渲染
+                        this._finishLoading();
                     }
+                } else if (!cacheLoaded) {
+                    this.showLoadError('数据格式错误: ' + validation.error);
+                    this._loaded = false;
                 }
             } else if (!cacheLoaded) {
-                // 【修复】本地环境显示友好提示
+                // 网络失败且没有缓存
                 if (window.location.protocol === 'file:') {
                     this.showLoadError('本地文件模式：请先将 Wiki 部署到服务器，或在服务器环境下访问。<br><span style="font-size:12px;color:#999">提示：也可通过 VS Code Live Server 等工具启动本地服务器</span>');
                 } else {
@@ -566,26 +589,60 @@
                 this._loaded = false;
             }
 
-            if (!cacheLoaded) {
-                // 【新增】同步正文词条与章节
-                if (this.data.chapters && this.data.chapters.length > 0) {
-                    this.syncBodyEntriesWithChapters();
-                }
-                this.setupUI();
-                this.router('home');
-                this.initKeyboardListeners();
+            this._deferredLoad();
+            const perfEnd = performance.now();
+            console.log('[Wiki] 初始化耗时:', Math.round(perfEnd - perfStart), 'ms');
+        },
+
+        // 【新增】统一的加载完成处理（避免重复代码）
+        _finishLoading() {
+            if (this.data.chapters && this.data.chapters.length > 0) {
+                this.syncBodyEntriesWithChapters();
             }
-            
-            // 【新增】加载 about.json（无论哪个路径都执行）
-            this.loadAbout();
-            
-            // 【回到xx】监听浏览器返回按钮，确保回到列表页时清空记录
-            window.addEventListener('popstate', (e) => {
-                const state = e.state;
-                if (state && state.view && ['home', 'characters', 'non-characters'].includes(state.view)) {
-                    this._clearPreviousEntry();
+            if (this.data.settings?.customFont) {
+                document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
+            }
+            this.hideLoadingState();
+            this.setupUI();
+            this.router('home');
+            this.initKeyboardListeners();
+        },
+
+        // 【新增】延迟非关键操作（about.json 加载、事件监听等）
+        _deferredLoad() {
+            const doDeferred = () => {
+                this.loadAbout();
+                window.addEventListener('popstate', (e) => {
+                    const state = e.state;
+                    if (state && state.view && ['home', 'characters', 'non-characters'].includes(state.view)) {
+                        this._clearPreviousEntry();
+                    }
+                });
+            };
+            // 优先使用 requestIdleCallback（浏览器空闲时执行）
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(doDeferred, { timeout: 3000 });
+            } else {
+                setTimeout(doDeferred, 500);
+            }
+        },
+
+        // 【新增】延迟写入 IndexedDB（iOS Safari 写入阻塞严重）
+        _deferCacheWrite(data) {
+            const doWrite = async () => {
+                try {
+                    await this.cacheSet('data', data);
+                    await this.cacheSet('time', Date.now());
+                    console.log('[Wiki] 缓存已更新');
+                } catch (e) {
+                    console.log('[Wiki] 缓存写入失败:', e.message);
                 }
-            });
+            };
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => doWrite(), { timeout: 5000 });
+            } else {
+                setTimeout(doWrite, 1000);
+            }
         },
 
         // 【新增】加载 about.json
@@ -617,6 +674,21 @@
         },
 
         // 从网络获取数据
+        // 【性能优化】带超时的 fetch，避免网络慢时卡住
+        async fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(timeoutId);
+                return response;
+            } catch (e) {
+                clearTimeout(timeoutId);
+                if (e.name === 'AbortError') throw new Error('请求超时');
+                throw e;
+            }
+        },
+
         async fetchFromNetwork() {
             // 【修复】本地 file:// 环境下 fetch 会被 CORS 阻止，跳过网络请求
             if (window.location.protocol === 'file:') {
@@ -627,19 +699,18 @@
             const pageUrl = new URL(window.location.href);
             const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
             const cacheBuster = '?t=' + Date.now();
+            // 【优化】精简重试路径，优先最可能的路径，减少重复请求
             const possiblePaths = [
-                new URL('data/data.json' + cacheBuster, pageUrl.origin + basePath).href,
                 new URL('./data/data.json' + cacheBuster, pageUrl.href).href,
                 './data/data.json' + cacheBuster,
-                'data/data.json' + cacheBuster,
-                '/data/data.json' + cacheBuster
+                'data/data.json' + cacheBuster
             ];
 
             console.log('[Wiki] 尝试路径:', possiblePaths);
 
             for (const path of possiblePaths) {
                 try {
-                    const response = await fetch(path, { cache: 'no-cache' });
+                    const response = await this.fetchWithTimeout(path, { cache: 'no-cache' }, 5000);
                     if (response.ok) {
                         const text = await response.text();
                         if (text.trim().startsWith('<')) continue;
@@ -660,27 +731,38 @@
             return loadedData;
         },
 
-        // 后台静默刷新
+        // 后台静默刷新（带超时，避免卡住）
         async backgroundRefresh() {
             console.log('[Wiki] 后台检查更新...');
-            const loadedData = await this.fetchFromNetwork();
-            if (loadedData && this.validateData(loadedData).valid) {
-                const newCount = loadedData.entries?.length || 0;
-                const oldCount = this.data.entries?.length || 0;
-                if (newCount !== oldCount) {
-                    console.log('[Wiki] 数据变化:', oldCount, '->', newCount);
-                    Object.assign(this.data, loadedData);
-                    try {
-                        await this.cacheSet('data', loadedData);
-                        await this.cacheSet('time', Date.now());
-                    } catch (e) {}
-                    this.setupUI();
-                    this.router('home');
-                    this.showToast('Wiki 数据已更新', 'success', 2000);
-                } else {
-                    console.log('[Wiki] 数据无变化');
-                    await this.cacheSet('time', Date.now());
+            try {
+                // 【优化】添加超时，避免后台刷新无限等待
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('后台刷新超时')), 15000)
+                );
+                const loadedData = await Promise.race([
+                    this.fetchFromNetwork(),
+                    timeoutPromise
+                ]);
+
+                if (loadedData && this.validateData(loadedData).valid) {
+                    const newCount = loadedData.entries?.length || 0;
+                    const oldCount = this.data.entries?.length || 0;
+                    if (newCount !== oldCount) {
+                        console.log('[Wiki] 数据变化:', oldCount, '->', newCount);
+                        this.data = { ...this.data, ...loadedData };
+                        this._deferCacheWrite(loadedData);
+                        this._finishLoading();
+                        this.showToast('Wiki 数据已更新', 'success', 2000);
+                    } else {
+                        console.log('[Wiki] 数据无变化');
+                        // 只更新时间戳，延迟写入
+                        if ('requestIdleCallback' in window) {
+                            requestIdleCallback(() => this.cacheSet('time', Date.now()).catch(() => {}), { timeout: 5000 });
+                        }
+                    }
                 }
+            } catch (e) {
+                console.log('[Wiki] 后台刷新失败:', e.message);
             }
         },
 
@@ -800,20 +882,10 @@
                     if (errorDiv) { errorDiv.textContent = '数据格式错误: ' + validation.error; errorDiv.classList.remove('hidden'); }
                     return;
                 }
-                Object.assign(this.data, data);
+                this.data = { ...this.data, ...data };
                 this._loaded = true;
-                // 保存到缓存
-                try {
-                    await this.cacheSet('data', data);
-                    await this.cacheSet('time', Date.now());
-                } catch (e) {
-                    console.log('[Wiki] 手动数据缓存失败:', e.message);
-                }
-                if (this.data.settings.customFont) {
-                    document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
-                }
-                this.setupUI();
-                this.router('home');
+                this._deferCacheWrite(data);
+                this._finishLoading();
                 this.showToast('数据手动加载成功！下次刷新将从缓存秒开。', 'success', 5000);
             } catch (e) {
                 if (errorDiv) { errorDiv.textContent = 'JSON 解析失败: ' + e.message; errorDiv.classList.remove('hidden'); }
@@ -833,17 +905,20 @@
                     subtitleEl.classList.add('hidden');
                 }
             }
-            // 设置时间轴选择器
+            // 设置时间轴选择器【修复】先清空已有选项，避免重复累积
             const selector = document.getElementById('timeline-selector');
-            if (selector && this.data.chapters && this.data.chapters.length > 0) {
-                const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
-                sortedChapters.forEach(ch => {
-                    const opt = document.createElement('option');
-                    opt.value = ch.id;
-                    opt.textContent = `${this.formatChapterNum(ch.num)} ${ch.title || ''}`;
-                    selector.appendChild(opt);
-                });
-                document.getElementById('timeline-bar').classList.remove('hidden');
+            if (selector) {
+                selector.innerHTML = '';
+                if (this.data.chapters && this.data.chapters.length > 0) {
+                    const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+                    sortedChapters.forEach(ch => {
+                        const opt = document.createElement('option');
+                        opt.value = ch.id;
+                        opt.textContent = `${this.formatChapterNum(ch.num)} ${ch.title || ''}`;
+                        selector.appendChild(opt);
+                    });
+                    document.getElementById('timeline-bar').classList.remove('hidden');
+                }
             }
         },
 
@@ -1612,15 +1687,37 @@
 
         getVisibleVersion(entry) {
             if (!entry || !entry.versions || entry.versions.length === 0) return null;
-            if (this.data.currentTimeline === 'latest') return entry.versions[entry.versions.length - 1];
+            if (this.data.currentTimeline === 'latest') {
+                if (entry.defaultPinnedVersion) {
+                    const pinned = entry.versions.find(v => v.vid === entry.defaultPinnedVersion);
+                    if (pinned) return pinned;
+                }
+                return entry.versions[entry.versions.length - 1];
+            }
             const currentCh = this.data.chapters.find(c => c.id === this.data.currentTimeline);
             if (!currentCh) return entry.versions[entry.versions.length - 1];
 
-            // 检查是否有置顶版本
-            if (entry.pinnedVersions && entry.pinnedVersions[this.data.currentTimeline]) {
-                const pinnedVid = entry.pinnedVersions[this.data.currentTimeline];
-                const pinned = entry.versions.find(v => v.vid === pinnedVid);
-                if (pinned) return pinned;
+            // 【修复】检查置顶版本：pinnedVersions 的键是区间起始章节ID
+            // 需要遍历查找当前章节所在的区间范围
+            if (entry.pinnedVersions) {
+                for (const [startChId, vid] of Object.entries(entry.pinnedVersions)) {
+                    const startCh = this.data.chapters.find(c => c.id === startChId);
+                    if (!startCh) continue;
+                    // 找到该区间的结束点（下一个有置顶设置的区间起始，或章节末尾）
+                    let endOrder = Infinity;
+                    for (const otherStartId of Object.keys(entry.pinnedVersions)) {
+                        if (otherStartId === startChId) continue;
+                        const otherCh = this.data.chapters.find(c => c.id === otherStartId);
+                        if (otherCh && otherCh.order > startCh.order && otherCh.order < endOrder) {
+                            endOrder = otherCh.order;
+                        }
+                    }
+                    // 当前章节是否在此区间内
+                    if (currentCh.order >= startCh.order && currentCh.order < endOrder) {
+                        const pinned = entry.versions.find(v => v.vid === vid);
+                        if (pinned) return pinned;
+                    }
+                }
             }
 
             // 查找当前时间轴下最新版本
@@ -2446,10 +2543,14 @@
             if (this.data.editingId) {
                 const currentEntry = this.data.entries.find(e => e.id === this.data.editingId);
                 if (currentEntry) {
-                    const currentVersion = this.getVisibleVersion(currentEntry);
+                    let currentVersion = this.data.viewingVersionId
+                        ? currentEntry.versions.find(v => v.vid === this.data.viewingVersionId)
+                        : null;
+                    if (!currentVersion) currentVersion = this.getVisibleVersion(currentEntry);
                     this.data.previousEntryId = this.data.editingId;
                     this.data.previousEntryName = currentVersion?.title || currentEntry.code;
                     this.data.previousEntryType = currentEntry.type;
+                    this.data.previousVersionId = this.data.viewingVersionId || currentVersion?.vid || null;
                     const chapterFrom = currentVersion?.chapterFrom;
                     if (chapterFrom) {
                         const ch = this.data.chapters.find(c => c.id === chapterFrom);
@@ -2467,14 +2568,20 @@
             this.data.previousEntryName = null;
             this.data.previousEntryType = null;
             this.data.previousEntryChapter = null;
+            this.data.previousVersionId = null;
         },
 
         goBackToPrevious() {
             if (this.data.previousEntryId) {
                 const prevId = this.data.previousEntryId;
+                const prevVersionId = this.data.previousVersionId;
                 // 【关键】使用"回到"后清空记录，不保留链式跳转
                 this._clearPreviousEntry();
-                this.openEntry(prevId);
+                if (prevVersionId) {
+                    this.openEntry(prevId, prevVersionId);
+                } else {
+                    this.openEntry(prevId);
+                }
             }
         }
     };
