@@ -2505,47 +2505,148 @@
         closeShareDialog() {
             document.querySelectorAll('[data-share-dialog]').forEach(el => el.remove());
         },
+        _stripIndexLinks(text) {
+            // 将索引链接语法替换为表面文本（支持预留的自定义蓝字文本displayText）
+            if (!text) return '';
+            return text
+                .replace(/\[\[[^\]|]+\|[^:\]]+:[^\]]+\]\]/g, (m) => { const x = m.match(/\[\[[^\]|]+\|[^:\]]+:([^\]]+)\]\]/); return x ? x[1] : m; })
+                .replace(/\[\[[^:\]]+:[^\]]+\]\]/g, (m) => { const x = m.match(/\[\[[^:\]]+:([^\]]+)\]\]/); return x ? x[1] : m; })
+                .replace(/\[\[([^\]]+)\]\]/g, '$1')
+                .replace(/@([^\[]+)\[[^\]]+\]/g, '@$1');
+        },
         _getCurrentEntryExportData() {
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
             if (!entry) return null;
             const version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || this.getVisibleVersion(entry) || entry.versions[entry.versions.length - 1];
             if (!version) return null;
-            let contentText = '', contentMarkdown = '';
+            const typeLabels = { character: '角色', 'non-character': '设定', body: '正文' };
+            const typeLabel = typeLabels[entry.type] || entry.type;
+            let chapterRange = '';
+            if (version.chapterFrom || version.chapterTo) {
+                const fromCh = this.data.chapters.find(c => c.id === version.chapterFrom);
+                const toCh = this.data.chapters.find(c => c.id === version.chapterTo);
+                const fs = fromCh ? (fromCh.num !== undefined ? String(fromCh.num) : (fromCh.title || '')) : '';
+                const ts = toCh ? (toCh.num !== undefined ? String(toCh.num) : (toCh.title || '')) : '';
+                if (fs && ts && fs !== ts) chapterRange = fs + ' ~ ' + ts;
+                else if (fs) chapterRange = fs;
+                else if (ts) chapterRange = ts;
+            }
+            let allVersions = [];
+            if (entry.versions && entry.versions.length > 1) {
+                entry.versions.forEach(v => {
+                    const isCurrent = v.vid === version.vid;
+                    let vr = '';
+                    if (v.chapterFrom || v.chapterTo) {
+                        const vf = this.data.chapters.find(c => c.id === v.chapterFrom);
+                        const vt = this.data.chapters.find(c => c.id === v.chapterTo);
+                        const vfs = vf ? (vf.num !== undefined ? String(vf.num) : (vf.title || '')) : '';
+                        const vts = vt ? (vt.num !== undefined ? String(vt.num) : (vt.title || '')) : '';
+                        if (vfs && vts && vfs !== vts) vr = vfs + '~' + vts;
+                        else if (vfs) vr = vfs;
+                        else if (vts) vr = vts;
+                    }
+                    allVersions.push({ title: v.title, isCurrent, range: vr, vid: v.vid });
+                });
+            }
+            let relations = [];
+            if (entry.type === 'character' && entry.relations && entry.relations.length > 0) {
+                entry.relations.forEach(rc => {
+                    const re = this.data.entries.find(e => e.id === rc.relatedId);
+                    if (re) {
+                        const rv = re.versions ? re.versions[0] : null;
+                        relations.push({ name: rv ? rv.title : re.code, relationName: rc.relationName || '相关', code: re.code });
+                    }
+                });
+            }
+            let synopsis = null;
+            if (entry.type === 'body') {
+                const bs = this.data.synopsis ? this.data.synopsis.find(s => s.entryId === entry.id) : null;
+                if (bs && bs.content) synopsis = this._stripIndexLinks(this.stripHtml(bs.content));
+            }
+            let contentText = '', contentMarkdown = '', contentHtml = '';
             if (version.content && version.content.blocks) {
                 version.content.blocks.forEach(block => {
-                    const text = this.stripHtml(block.text || '');
-                    if (block.type === 'h2') { contentText += text + '\n\n'; contentMarkdown += '## ' + text + '\n\n'; }
-                    else if (block.type === 'h3') { contentText += text + '\n\n'; contentMarkdown += '### ' + text + '\n\n'; }
-                    else { contentText += text + '\n\n'; contentMarkdown += text + '\n\n'; }
+                    const raw = block.text || '';
+                    const plain = this._stripIndexLinks(raw);
+                    const safe = this.escapeHtml(plain);
+                    if (block.type === 'h2') {
+                        contentText += plain + '\n\n'; contentMarkdown += '## ' + plain + '\n\n';
+                        contentHtml += '<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:24px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">' + safe + '</h2>';
+                    } else if (block.type === 'h3') {
+                        contentText += plain + '\n\n'; contentMarkdown += '### ' + plain + '\n\n';
+                        contentHtml += '<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:18px 0 8px;">' + safe + '</h3>';
+                    } else {
+                        contentText += plain + '\n\n'; contentMarkdown += plain + '\n\n';
+                        let rendered = this.parseInlineMarkdown ? this.parseInlineMarkdown(plain) : safe;
+                        contentHtml += '<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:10px 0;text-align:justify;">' + rendered + '</p>';
+                    }
                 });
             }
             const mark = this.data.settings?.exportMark;
-            let markText = '', markMarkdown = '';
-            if (mark && mark.enabled) {
-                if (mark.text) { markText = '\n---\n' + mark.text; markMarkdown = '\n\n---\n\n' + mark.text; }
+            let markText = '', markMarkdown = '', markHtml = '';
+            if (mark && mark.enabled && mark.text) {
+                markText = '\n---\n' + mark.text;
+                markMarkdown = '\n\n---\n\n' + mark.text;
+                markHtml = '<div style="margin-top:24px;padding-top:16px;border-top:2px solid #e5e7eb;color:#6b7280;font-size:13px;">' + this.escapeHtml(mark.text).replace(/\n/g, '<br>') + '</div>';
             }
-            return { entry, version, contentText, contentMarkdown, markText, markMarkdown, mark };
+            return { entry, version, typeLabel, chapterRange, allVersions, relations, synopsis, contentText, contentMarkdown, contentHtml, markText, markMarkdown, markHtml, mark };
         },
         exportEntryAsTxt() {
-            const data = this._getCurrentEntryExportData();
-            if (!data) return;
-            let txt = `${data.version.title}\n编号: ${data.entry.code}\n`;
-            if (data.version.subtitle) txt += `题记: ${this.stripHtml(data.version.subtitle)}\n`;
-            txt += `\n${data.contentText}${data.markText}`;
+            const d = this._getCurrentEntryExportData();
+            if (!d) return;
+            let txt = '';
+            txt += '╔' + '═'.repeat(38) + '╗\n';
+            const pad = Math.max(0, Math.floor((38 - d.version.title.length) / 2));
+            txt += '║' + ' '.repeat(pad) + d.version.title + ' '.repeat(Math.max(0, 38 - d.version.title.length - pad)) + '║\n';
+            txt += '╠' + '═'.repeat(38) + '╣\n';
+            txt += '║ 编号: ' + d.entry.code + ' '.repeat(Math.max(0, 30 - String(d.entry.code).length)) + '║\n';
+            txt += '║ 类型: ' + d.typeLabel + ' '.repeat(Math.max(0, 30 - d.typeLabel.length)) + '║\n';
+            if (d.chapterRange) txt += '║ 章节: ' + d.chapterRange + ' '.repeat(Math.max(0, 30 - d.chapterRange.length)) + '║\n';
+            txt += '╚' + '═'.repeat(38) + '╝\n\n';
+            if (d.allVersions.length > 0) {
+                txt += '【版本】\n';
+                d.allVersions.forEach(v => { txt += (v.isCurrent ? '  ▶ ' : '  ○ ') + v.title + (v.range ? ' (' + v.range + ')' : '') + '\n'; });
+                txt += '\n';
+            }
+            if (d.relations.length > 0) {
+                txt += '【关系】\n';
+                d.relations.forEach(r => { txt += '  • ' + r.name + ' — ' + r.relationName + '\n'; });
+                txt += '\n';
+            }
+            if (d.synopsis) txt += '【剧情梗概】\n' + d.synopsis + '\n\n';
+            if (d.version.subtitle) txt += '【题记】\n  "' + this.stripHtml(d.version.subtitle) + '"\n\n';
+            if (d.contentText.trim()) txt += '【内容】\n\n' + d.contentText;
+            if (d.markText) txt += d.markText;
+            txt += '\n\n── 导自 ' + (this.data.settings?.name || 'Wiki') + ' ──';
             const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `${data.version.title}_${data.entry.code}.txt`; a.click(); URL.revokeObjectURL(url);
+            const a = document.createElement('a'); a.href = url; a.download = d.version.title + '_' + d.entry.code + '.txt'; a.click(); URL.revokeObjectURL(url);
             this.showToast('TXT导出成功', 'success'); this.closeShareDialog();
         },
         exportEntryAsMarkdown() {
-            const data = this._getCurrentEntryExportData();
-            if (!data) return;
-            let md = `# ${data.version.title}\n\n> **编号**: ${data.entry.code}\n`;
-            if (data.version.subtitle) md += `> **题记**: ${this.stripHtml(data.version.subtitle)}\n`;
-            md += `\n${data.contentMarkdown}${data.markMarkdown}`;
+            const d = this._getCurrentEntryExportData();
+            if (!d) return;
+            let md = '# ' + d.version.title + '\n\n> **编号**: `' + d.entry.code + '`\n> **类型**: ' + d.typeLabel + '\n';
+            if (d.chapterRange) md += '> **章节**: ' + d.chapterRange + '\n';
+            md += '\n---\n\n';
+            if (d.allVersions.length > 0) {
+                md += '## 版本\n\n';
+                d.allVersions.forEach(v => { md += '- ' + (v.isCurrent ? '**【当前】** ' : '') + v.title + (v.range ? ' (`' + v.range + '`)' : '') + '\n'; });
+                md += '\n';
+            }
+            if (d.relations.length > 0) {
+                md += '## 关系\n\n';
+                d.relations.forEach(r => { md += '- **' + r.name + '** — ' + r.relationName + '\n'; });
+                md += '\n';
+            }
+            if (d.synopsis) md += '## 剧情梗概\n\n' + d.synopsis + '\n\n';
+            if (d.version.subtitle) md += '## 题记\n\n> ' + this.stripHtml(d.version.subtitle) + '\n\n';
+            if (d.contentMarkdown.trim()) md += d.contentMarkdown;
+            if (d.markMarkdown) md += d.markMarkdown;
+            md += '\n\n---\n\n*导自 ' + (this.data.settings?.name || 'Wiki') + '*\n';
             const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `${data.version.title}_${data.entry.code}.md`; a.click(); URL.revokeObjectURL(url);
+            const a = document.createElement('a'); a.href = url; a.download = d.version.title + '_' + d.entry.code + '.md'; a.click(); URL.revokeObjectURL(url);
             this.showToast('Markdown导出成功', 'success'); this.closeShareDialog();
         },
         async exportEntryAsImage() {
@@ -2554,30 +2655,34 @@
                 try { await this._loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); }
                 catch (e) { this.showToast('图片导出库加载失败', 'error'); return; }
             }
-            const data = this._getCurrentEntryExportData();
-            if (!data) return;
-            const { entry, version, mark } = data;
+            const d = this._getCurrentEntryExportData();
+            if (!d) return;
             const container = document.createElement('div');
-            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:white;padding:40px;font-family:sans-serif;z-index:-1;';
-            let markHtml = '';
-            if (mark && mark.enabled && mark.text) {
-                markHtml = `<div style="margin-top:20px;padding-top:20px;border-top:2px solid #e5e7eb;color:#6b7280;font-size:14px;">${this.escapeHtml(mark.text).replace(/\n/g,'<br>')}</div>`;
+            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#ffffff;padding:48px;font-family:"Noto Sans SC","Microsoft YaHei",sans-serif;z-index:-1;';
+            let extra = '';
+            if (d.allVersions.length > 0) {
+                let vh = '<div style="margin:20px 0;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;"><div style="font-size:13px;font-weight:bold;color:#475569;margin-bottom:10px;">📋 版本</div>';
+                d.allVersions.forEach(v => { vh += '<div style="font-size:14px;color:#334155;padding:4px 0;">' + (v.isCurrent ? '<span style="color:#4f46e5;font-weight:bold;">▶</span> ' : '<span style="color:#94a3b8;">○</span> ') + this.escapeHtml(v.title) + (v.range ? ' <span style="color:#94a3b8;font-size:12px;">(' + this.escapeHtml(v.range) + ')</span>' : '') + '</div>'; });
+                vh += '</div>'; extra += vh;
             }
-            let blocksHtml = '';
-            if (version.content && version.content.blocks) {
-                version.content.blocks.forEach(block => {
-                    const text = this.escapeHtml(this.stripHtml(block.text || ''));
-                    if (block.type === 'h2') blocksHtml += `<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:20px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">${text}</h2>`;
-                    else if (block.type === 'h3') blocksHtml += `<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:16px 0 8px;">${text}</h3>`;
-                    else blocksHtml += `<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:8px 0;">${this.parseContentText(block.text || '')}</p>`;
-                });
+            if (d.relations.length > 0) {
+                let rh = '<div style="margin:20px 0;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;"><div style="font-size:13px;font-weight:bold;color:#166534;margin-bottom:10px;">🔗 关系</div><div style="display:flex;flex-wrap:wrap;gap:8px;">';
+                d.relations.forEach(r => { rh += '<span style="display:inline-block;padding:6px 12px;background:#dcfce7;border-radius:20px;font-size:13px;color:#15803d;">' + this.escapeHtml(r.name) + '<span style="color:#86efac;margin:0 4px;">·</span>' + this.escapeHtml(r.relationName) + '</span>'; });
+                rh += '</div></div>'; extra += rh;
             }
-            container.innerHTML = `<div style="max-width:720px;margin:0 auto;"><div style="text-align:center;margin-bottom:24px;padding-bottom:20px;border-bottom:3px solid #4f46e5;"><h1 style="font-size:28px;font-weight:bold;color:#1f2937;margin:0 0 8px;">${this.escapeHtml(version.title)}</h1><div style="font-size:13px;color:#6b7280;font-family:monospace;">${entry.code}</div>${version.subtitle ? `<div style="font-size:15px;color:#6b7280;font-style:italic;margin-top:8px;">${this.escapeHtml(this.stripHtml(version.subtitle))}</div>` : ''}</div><div style="color:#374151;">${blocksHtml}</div>${markHtml}<div style="margin-top:30px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">导出自 ${this.escapeHtml(this.data.settings.name || 'Wiki')}</div></div>`;
+            if (d.synopsis) {
+                extra += '<div style="margin:20px 0;padding:16px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;"><div style="font-size:13px;font-weight:bold;color:#92400e;margin-bottom:10px;">📖 剧情梗概</div><div style="font-size:14px;color:#78350f;line-height:1.8;">' + this.escapeHtml(d.synopsis).replace(/\n/g, '<br>') + '</div></div>';
+            }
+            let subH = '';
+            if (d.version.subtitle) {
+                subH = '<div style="margin:16px 0;padding:16px 20px;border-left:4px solid #4f46e5;background:#eef2ff;border-radius:0 8px 8px 0;font-size:15px;color:#4338ca;font-style:italic;line-height:1.8;">' + (this.parseInlineMarkdown ? this.parseInlineMarkdown(this.stripHtml(d.version.subtitle)) : this.escapeHtml(this.stripHtml(d.version.subtitle))) + '</div>';
+            }
+            container.innerHTML = '<div style="max-width:720px;margin:0 auto;"><div style="text-align:center;margin-bottom:8px;padding-bottom:24px;border-bottom:3px solid #4f46e5;"><div style="display:inline-block;padding:4px 14px;background:#4f46e5;color:#fff;font-size:12px;border-radius:12px;margin-bottom:12px;">' + this.escapeHtml(d.typeLabel) + '</div><h1 style="font-size:30px;font-weight:bold;color:#1f2937;margin:0 0 8px;line-height:1.3;">' + this.escapeHtml(d.version.title) + '</h1><div style="font-size:13px;color:#6b7280;font-family:monospace;">' + d.entry.code + (d.chapterRange ? ' · 第' + this.escapeHtml(d.chapterRange) + '章' : '') + '</div></div>' + extra + subH + '<div style="margin-top:24px;">' + d.contentHtml + '</div>' + d.markHtml + '<div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af;">导自 ' + this.escapeHtml(this.data.settings?.name || 'Wiki') + '</div></div>';
             document.body.appendChild(container);
             try {
-                const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: 800, height: container.scrollHeight });
+                const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: 800, height: container.scrollHeight, logging: false });
                 const url = canvas.toDataURL('image/png');
-                const a = document.createElement('a'); a.href = url; a.download = `${version.title}_${entry.code}.png`; a.click();
+                const a = document.createElement('a'); a.href = url; a.download = d.version.title + '_' + d.entry.code + '.png'; a.click();
                 this.showToast('图片导出成功', 'success');
             } catch (e) { console.error('图片导出失败:', e); this.showToast('图片导出失败', 'error'); }
             finally { container.remove(); }
@@ -2593,9 +2698,7 @@
         updateExportMarkText(text) {
             if (!this.data.settings.exportMark) this.data.settings.exportMark = { enabled: false, text: '' };
             this.data.settings.exportMark.text = text;
-        },
-
-        // ==================== 键盘导航 ====================
+        },        // ==================== 键盘导航 ====================
         initKeyboardListeners() {
             if (this._keyboardHandler) document.removeEventListener('keydown', this._keyboardHandler);
             this._keyboardHandler = (e) => {
