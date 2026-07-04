@@ -12,7 +12,6 @@
     <meta name="wiki-build" content="v2-fix4">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         @import url('https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
         :root { --color-primary: #4f46e5; --color-bg: #f3f4f6; --custom-font: 'Noto Sans SC', sans-serif; }
@@ -284,9 +283,6 @@
                     <div class="flex gap-2 items-center">
                         <span id="detail-code" class="entry-code"></span>
                         <span id="detail-version-badge" class="hidden px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">版本: <span id="detail-version-name">默认</span></span>
-                        <button onclick="app.showShareDialog()" class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-sm hover:bg-emerald-100 transition flex items-center gap-1" title="分享">
-                            <i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline">分享</span>
-                        </button>
                     </div>
                 </div>
                 <div id="detail-content" class="prose prose-sm max-w-none"></div>
@@ -913,11 +909,6 @@
             const selector = document.getElementById('timeline-selector');
             if (selector) {
                 selector.innerHTML = '';
-                // 修复：重新添加"最新进度"选项
-                const latestOpt = document.createElement('option');
-                latestOpt.value = 'latest';
-                latestOpt.textContent = '最新进度 (全部内容)';
-                selector.appendChild(latestOpt);
                 if (this.data.chapters && this.data.chapters.length > 0) {
                     const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
                     sortedChapters.forEach(ch => {
@@ -928,8 +919,6 @@
                     });
                     document.getElementById('timeline-bar').classList.remove('hidden');
                 }
-                // 修复：根据当前时间轴恢复选中状态
-                selector.value = this.data.currentTimeline || 'latest';
             }
         },
 
@@ -1999,147 +1988,6 @@
             }
         },
 
-
-        // ==================== 词条导出分享 ====================
-        showShareDialog() {
-            const entry = this.data.entries.find(e => e.id === this.data.editingId);
-            if (!entry) return;
-            const version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || this.getVisibleVersion(entry) || entry.versions[0];
-            if (!version) return;
-            const overlay = document.createElement('div');
-            overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
-            overlay.id = 'share-dialog-overlay';
-            overlay.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform">
-                    <div class="text-center mb-6">
-                        <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-share-nodes text-emerald-600 text-2xl"></i></div>
-                        <h3 class="text-xl font-bold text-gray-800 mb-1">分享词条</h3>
-                        <p class="text-sm text-gray-500">${this.escapeHtml(version.title)}</p>
-                    </div>
-                    <div class="space-y-3">
-                        <button onclick="app.exportEntryAsTxt()" class="w-full py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-file-lines text-blue-500"></i> 导出为 TXT 文本
-                        </button>
-                        <button onclick="app.exportEntryAsMarkdown()" class="w-full py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-file-code text-purple-500"></i> 导出为 Markdown
-                        </button>
-                        <button onclick="app.exportEntryAsImage()" class="w-full py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-image text-pink-500"></i> 导出为图片
-                        </button>
-                    </div>
-                    <button onclick="document.getElementById('share-dialog-overlay').remove()" class="w-full mt-4 py-2.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition text-sm font-medium">取消</button>
-                </div>`;
-            document.body.appendChild(overlay);
-            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-        },
-
-        _getShareMarkText() {
-            return (this.data.settings && this.data.settings.shareMark && this.data.settings.shareMark.text) ? this.data.settings.shareMark.text : '';
-        },
-
-        _getShareMarkImage() {
-            return (this.data.settings && this.data.settings.shareMark && this.data.settings.shareMark.image) ? this.data.settings.shareMark.image : '';
-        },
-
-        _buildEntryExportContent(entry, version, format) {
-            const markText = this._getShareMarkText();
-            const markImage = this._getShareMarkImage();
-            let content = '';
-            if (format === 'txt') {
-                content += `${version.title}\n`;
-                if (version.subtitle) content += `\n${version.subtitle}\n`;
-                content += `\n编号: ${entry.code}\n`;
-                if (entry.camp) content += `阵营: ${entry.camp}\n`;
-                if (version.blocks && version.blocks.length > 0) {
-                    content += `\n---\n\n`;
-                    version.blocks.forEach(block => {
-                        if (block.type === 'h2') content += `## ${block.text}\n\n`;
-                        else if (block.type === 'h3') content += `### ${block.text}\n\n`;
-                        else if (block.type === 'p') content += `${block.text}\n\n`;
-                    });
-                }
-                if (markText) content += `\n---\n${markText}\n`;
-            } else if (format === 'markdown') {
-                content += `# ${version.title}\n\n`;
-                if (version.subtitle) content += `> ${version.subtitle}\n\n`;
-                content += `- **编号**: ${entry.code}\n`;
-                if (entry.camp) content += `- **阵营**: ${entry.camp}\n`;
-                if (version.blocks && version.blocks.length > 0) {
-                    content += `\n---\n\n`;
-                    version.blocks.forEach(block => {
-                        if (block.type === 'h2') content += `## ${block.text}\n\n`;
-                        else if (block.type === 'h3') content += `### ${block.text}\n\n`;
-                        else if (block.type === 'p') content += `${block.text}\n\n`;
-                    });
-                }
-                if (markText) content += `\n---\n\n${markText}\n`;
-                if (markImage) content += `\n![标记](${markImage})\n`;
-            }
-            return content;
-        },
-
-        exportEntryAsTxt() {
-            const entry = this.data.entries.find(e => e.id === this.data.editingId);
-            if (!entry) return;
-            const version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || this.getVisibleVersion(entry) || entry.versions[0];
-            const content = this._buildEntryExportContent(entry, version, 'txt');
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${version.title}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            this.showToast('已导出 TXT', 'success');
-            const overlay = document.getElementById('share-dialog-overlay');
-            if (overlay) overlay.remove();
-        },
-
-        exportEntryAsMarkdown() {
-            const entry = this.data.entries.find(e => e.id === this.data.editingId);
-            if (!entry) return;
-            const version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || this.getVisibleVersion(entry) || entry.versions[0];
-            const content = this._buildEntryExportContent(entry, version, 'markdown');
-            const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${version.title}.md`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            this.showToast('已导出 Markdown', 'success');
-            const overlay = document.getElementById('share-dialog-overlay');
-            if (overlay) overlay.remove();
-        },
-
-        async exportEntryAsImage() {
-            const entry = this.data.entries.find(e => e.id === this.data.editingId);
-            if (!entry) return;
-            const version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || this.getVisibleVersion(entry) || entry.versions[0];
-            const overlay = document.getElementById('share-dialog-overlay');
-            if (overlay) overlay.remove();
-            this.showToast('正在生成图片...', 'info', 5000);
-            try {
-                const detailEl = document.getElementById('detail-content');
-                if (!detailEl) { this.showToast('无法找到内容区域', 'error'); return; }
-                const canvas = await html2canvas(detailEl, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-                const link = document.createElement('a');
-                link.download = `${version.title}.png`;
-                link.href = canvas.toDataURL();
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                this.showToast('已导出图片', 'success');
-            } catch (e) {
-                console.error('导出图片失败:', e);
-                this.showToast('导出图片失败，请使用 TXT 或 Markdown 格式', 'error');
-            }
-        },
-
         // ==================== 公告 ====================
         viewAnnouncement() {
             const ann = this.data.announcements?.find(a => a.isActive);
@@ -2179,7 +2027,6 @@
             const clone = tpl.content.cloneNode(true);
             container.appendChild(clone);
             this.initDraggablePanel();
-            this.initGraphPan();
             setTimeout(() => this.renderGraphNodes(), 50);
         },
 
@@ -2189,69 +2036,12 @@
             const handle = panel.querySelector('.draggable-handle');
             if (!handle) return;
             let isDragging = false, startX, startY, initialX, initialY;
-            const onMouseDown = (e) => { isDragging = true; panel.classList.add('dragging'); startX = e.clientX; startY = e.clientY; const rect = panel.getBoundingClientRect(); initialX = rect.left; initialY = rect.top; e.preventDefault(); };
-            const onMouseMove = (e) => { if (!isDragging) return; const dx = e.clientX - startX; const dy = e.clientY - startY; panel.style.left = `${initialX + dx}px`; panel.style.top = `${initialY + dy}px`; panel.style.right = 'auto'; };
-            const onMouseUp = () => { if (isDragging) { isDragging = false; panel.classList.remove('dragging'); } };
-            handle.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-            // 触摸支持
-            const onTouchStart = (e) => { isDragging = true; panel.classList.add('dragging'); const touch = e.touches[0]; startX = touch.clientX; startY = touch.clientY; const rect = panel.getBoundingClientRect(); initialX = rect.left; initialY = rect.top; };
-            const onTouchMove = (e) => { if (!isDragging) return; const touch = e.touches[0]; const dx = touch.clientX - startX; const dy = touch.clientY - startY; panel.style.left = `${initialX + dx}px`; panel.style.top = `${initialY + dy}px`; panel.style.right = 'auto'; };
-            const onTouchEnd = () => { isDragging = false; panel.classList.remove('dragging'); };
-            handle.addEventListener('touchstart', onTouchStart, {passive: true});
-            document.addEventListener('touchmove', onTouchMove, {passive: true});
-            document.addEventListener('touchend', onTouchEnd);
+            handle.addEventListener('mousedown', (e) => { isDragging = true; panel.classList.add('dragging'); startX = e.clientX; startY = e.clientY; const rect = panel.getBoundingClientRect(); initialX = rect.left; initialY = rect.top; e.preventDefault(); });
+            document.addEventListener('mousemove', (e) => { if (!isDragging) return; const dx = e.clientX - startX; const dy = e.clientY - startY; panel.style.left = `${initialX + dx}px`; panel.style.top = `${initialY + dy}px`; panel.style.right = 'auto'; });
+            document.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; panel.classList.remove('dragging'); } });
         },
 
-        initGraphPan() {
-            const container = document.getElementById('graph-container');
-            if (!container) return;
-            let isPanning = false, startX, startY, initialX, initialY;
-            container.addEventListener('mousedown', (e) => {
-                if (e.target.closest('#graph-info-panel')) return;
-                isPanning = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                initialX = this.data.graphState.translateX;
-                initialY = this.data.graphState.translateY;
-                container.style.cursor = 'grabbing';
-                e.preventDefault();
-            });
-            document.addEventListener('mousemove', (e) => {
-                if (!isPanning) return;
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-                this.data.graphState.translateX = initialX + dx;
-                this.data.graphState.translateY = initialY + dy;
-                this.applyGraphTransform();
-            });
-            document.addEventListener('mouseup', () => {
-                if (isPanning) { isPanning = false; container.style.cursor = 'grab'; }
-            });
-            // 触摸支持
-            container.addEventListener('touchstart', (e) => {
-                if (e.target.closest('#graph-info-panel')) return;
-                isPanning = true;
-                const touch = e.touches[0];
-                startX = touch.clientX;
-                startY = touch.clientY;
-                initialX = this.data.graphState.translateX;
-                initialY = this.data.graphState.translateY;
-            }, {passive: true});
-            document.addEventListener('touchmove', (e) => {
-                if (!isPanning) return;
-                const touch = e.touches[0];
-                const dx = touch.clientX - startX;
-                const dy = touch.clientY - startY;
-                this.data.graphState.translateX = initialX + dx;
-                this.data.graphState.translateY = initialY + dy;
-                this.applyGraphTransform();
-            }, {passive: true});
-            document.addEventListener('touchend', () => { isPanning = false; });
-        },
-
-        togglePanelCollapse()
+        togglePanelCollapse() {
             const content = document.getElementById('panel-content');
             const icon = document.querySelector('#graph-info-panel button i');
             if (!content || !icon) return;
