@@ -376,7 +376,7 @@
 
     <!-- 词条分享弹窗模板 -->
     <template id="tpl-share-dialog">
-        <div class="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 fade-in" onclick="if(event.target === this) app.closeShareDialog()">
+        <div data-share-dialog class="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 fade-in" onclick="if(event.target === this) app.closeShareDialog()">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
                 <div class="p-4 border-b bg-gradient-to-r from-emerald-50 to-teal-50 flex justify-between items-center">
                     <div class="flex items-center gap-2">
@@ -515,9 +515,12 @@
                 const db = await this.openCacheDB();
                 return new Promise((resolve, reject) => {
                     const tx = db.transaction('data', 'readwrite');
+                    // 【iOS优化】添加transaction.oncomplete避免iOS上事务挂起
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(new Error('transaction aborted'));
                     const store = tx.objectStore('data');
                     const req = store.put(value, key);
-                    req.onsuccess = () => resolve();
                     req.onerror = () => reject(req.error);
                 });
             } catch (e) {
@@ -559,9 +562,12 @@
             let cacheLoaded = false;
 
             // ===== 阶段1：尝试从缓存加载（快速路径）=====
+            // 【iOS优化】并行读取缓存数据和时间戳，减少等待
             try {
-                const cachedData = await this.cacheGet('data');
-                const cacheTime = await this.cacheGet('time');
+                const [cachedData, cacheTime] = await Promise.all([
+                    this.cacheGet('data'),
+                    this.cacheGet('time')
+                ]);
                 if (cachedData && this.validateData(cachedData).valid) {
                     const cacheAge = cacheTime ? (Date.now() - parseInt(cacheTime)) : Infinity;
                     const cacheAgeMinutes = Math.round(cacheAge / 60000);
@@ -577,8 +583,15 @@
                     // 缓存新鲜（<60分钟）→ 后台静默检查更新后直接返回
                     if (cacheAgeMinutes < 60) {
                         console.log('[Wiki] 缓存新鲜，后台检查更新...');
-                        this._deferredLoad();
-                        this.backgroundRefresh();
+                        // 【iOS优化】串行执行延迟任务，避免并发导致iOS卡顿
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                        if (isIOS) {
+                            this.loadAbout();
+                            setTimeout(() => this.backgroundRefresh(), 500);
+                        } else {
+                            this._deferredLoad();
+                            this.backgroundRefresh();
+                        }
                         return;
                     }
 
@@ -667,11 +680,12 @@
                     }
                 });
             };
-            // 优先使用 requestIdleCallback（浏览器空闲时执行）
-            if ('requestIdleCallback' in window) {
+            // 【iOS优化】iOS上requestIdleCallback不可靠，直接使用setTimeout
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            if (!isIOS && 'requestIdleCallback' in window) {
                 requestIdleCallback(doDeferred, { timeout: 3000 });
             } else {
-                setTimeout(doDeferred, 500);
+                setTimeout(doDeferred, isIOS ? 100 : 500);
             }
         },
 
@@ -686,10 +700,12 @@
                     console.log('[Wiki] 缓存写入失败:', e.message);
                 }
             };
-            if ('requestIdleCallback' in window) {
+            // 【iOS优化】iOS上requestIdleCallback不可靠，统一使用setTimeout
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            if (!isIOS && 'requestIdleCallback' in window) {
                 requestIdleCallback(() => doWrite(), { timeout: 5000 });
             } else {
-                setTimeout(doWrite, 1000);
+                setTimeout(doWrite, isIOS ? 200 : 1000);
             }
         },
 
@@ -725,7 +741,10 @@
         // 【性能优化】带超时的 fetch，避免网络慢时卡住
         async fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            // 【iOS优化】确保最小超时不低于2秒，避免iOS慢网络过早超时
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const finalTimeout = Math.max(timeoutMs, isIOS ? 2000 : 1500);
+            const timeoutId = setTimeout(() => controller.abort(), finalTimeout);
             try {
                 const response = await fetch(url, { ...options, signal: controller.signal });
                 clearTimeout(timeoutId);
@@ -746,7 +765,11 @@
             let loadedData = null;
             const pageUrl = new URL(window.location.href);
             const basePath = pageUrl.pathname.endsWith('/') ? pageUrl.pathname : pageUrl.pathname.replace(/\/[^\/]*$/, '/');
-            const cacheBuster = '?t=' + Date.now();
+            // 【iOS优化】使用更短的cacheBuster，减少URL解析开销
+            const cacheBuster = '?_=' + Date.now().toString(36);
+            // 【iOS优化】检测iOS设备，调整超时策略
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const fetchTimeout = isIOS ? 4000 : 5000;
             // 【优化】精简重试路径，优先最可能的路径，减少重复请求
             const possiblePaths = [
                 new URL('./data/data.json' + cacheBuster, pageUrl.href).href,
@@ -754,11 +777,11 @@
                 'data/data.json' + cacheBuster
             ];
 
-            console.log('[Wiki] 尝试路径:', possiblePaths);
+            console.log('[Wiki] 尝试路径:', possiblePaths, 'iOS:', isIOS, '超时:', fetchTimeout);
 
             for (const path of possiblePaths) {
                 try {
-                    const response = await this.fetchWithTimeout(path, { cache: 'no-cache' }, 5000);
+                    const response = await this.fetchWithTimeout(path, { cache: 'no-cache' }, fetchTimeout);
                     if (response.ok) {
                         const text = await response.text();
                         if (text.trim().startsWith('<')) continue;
@@ -781,6 +804,13 @@
 
         // 后台静默刷新（带超时，避免卡住）
         async backgroundRefresh() {
+            // 【iOS优化】如果60秒内已检查过，跳过本次后台刷新
+            const now = Date.now();
+            if (this._lastBgRefresh && (now - this._lastBgRefresh) < 60000) {
+                console.log('[Wiki] 后台刷新跳过（60秒内已检查）');
+                return;
+            }
+            this._lastBgRefresh = now;
             console.log('[Wiki] 后台检查更新...');
             try {
                 // 【优化】添加超时，避免后台刷新无限等待
@@ -803,10 +833,8 @@
                         this.showToast('Wiki 数据已更新', 'success', 2000);
                     } else {
                         console.log('[Wiki] 数据无变化');
-                        // 只更新时间戳，延迟写入
-                        if ('requestIdleCallback' in window) {
-                            requestIdleCallback(() => this.cacheSet('time', Date.now()).catch(() => {}), { timeout: 5000 });
-                        }
+                        // 只更新时间戳，延迟写入（iOS用setTimeout替代requestIdleCallback更稳定）
+                        setTimeout(() => this.cacheSet('time', Date.now()).catch(() => {}), 500);
                     }
                 }
             } catch (e) {
@@ -2475,9 +2503,7 @@
             document.body.appendChild(clone);
         },
         closeShareDialog() {
-            document.querySelectorAll('.fixed.inset-0.bg-black\/50.z-\[9999\]').forEach(el => {
-                if (el.querySelector('.fa-share-nodes')) el.remove();
-            });
+            document.querySelectorAll('[data-share-dialog]').forEach(el => el.remove());
         },
         _getCurrentEntryExportData() {
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
