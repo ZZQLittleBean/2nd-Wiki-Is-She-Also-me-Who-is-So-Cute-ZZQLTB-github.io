@@ -1386,12 +1386,20 @@
                     groupTitle = entry.customSettingType.trim();
                     groupIcon = 'fa-folder-open';
                 }
-                if (!groups[groupKey]) groups[groupKey] = { title: groupTitle, icon: groupIcon, type, items: [] };
+                if (!groups[groupKey]) groups[groupKey] = { key: groupKey, title: groupTitle, icon: groupIcon, type, items: [] };
                 groups[groupKey].items.push(entry);
             });
 
-            const typeOrder = ['world', 'document', 'art', 'faction'];
+            // 【功能2】按 categoryOrder 目录排序配置排列
+            const catOrder = this.data.settings?.settingConfig?.categoryOrder || [];
             const sortedKeys = Object.keys(groups).sort((a, b) => {
+                const ia = catOrder.indexOf(a);
+                const ib = catOrder.indexOf(b);
+                if (ia >= 0 && ib >= 0) return ia - ib;
+                if (ia >= 0) return -1;
+                if (ib >= 0) return 1;
+                // 默认预设排序
+                const typeOrder = ['world', 'document', 'art', 'faction'];
                 const aIsPreset = typeOrder.includes(groups[a].type);
                 const bIsPreset = typeOrder.includes(groups[b].type);
                 if (aIsPreset && !bIsPreset) return -1;
@@ -1401,17 +1409,38 @@
 
             sortedKeys.forEach(key => {
                 const group = groups[key];
-                const visibleItems = group.items.filter(entry => {
+                // 【功能3】应用 categoryDisplay 显示配置：排序 + 隐藏
+                const displayCfg = this.data.settings?.settingConfig?.categoryDisplay?.[key] || {};
+                const displayOrder = displayCfg.displayOrder || [];
+                const homeHidden = displayCfg.homeHidden || [];
+
+                // 先过滤未来词条
+                let sortedItems = group.items.filter(entry => {
                     const version = this.getVisibleVersion(entry) || entry.versions[0];
                     return this.getSettingTimeStatus(entry, version) !== 'future';
                 });
+
+                // 按 displayOrder 排序
+                if (displayOrder.length > 0) {
+                    sortedItems.sort((a, b) => {
+                        const ia = displayOrder.indexOf(a.id);
+                        const ib = displayOrder.indexOf(b.id);
+                        if (ia >= 0 && ib >= 0) return ia - ib;
+                        if (ia >= 0) return -1;
+                        if (ib >= 0) return 1;
+                        return 0;
+                    });
+                }
+
+                // 过滤隐藏的，只显示前8个
+                const visibleItems = sortedItems.filter(e => !homeHidden.includes(e.id)).slice(0, 8);
                 if (visibleItems.length === 0) return;
 
                 const section = document.createElement('div');
                 section.className = 'col-span-full mb-6';
                 section.innerHTML = `
                     <div class="setting-category-header">
-                        <div class="setting-category-title"><i class="fa-solid ${group.icon} text-indigo-600 text-lg"></i><span class="text-lg font-bold text-gray-800">${group.title}</span><span class="setting-count-badge">${visibleItems.length}个</span></div>
+                        <div class="setting-category-title"><i class="fa-solid ${group.icon} text-indigo-600 text-lg"></i><span class="text-lg font-bold text-gray-800">${group.title}</span><span class="setting-count-badge">${sortedItems.length}个</span></div>
                         <button onclick="app.viewSettingCategory('${key}')" class="setting-more-btn">更多 <i class="fa-solid fa-chevron-right text-xs"></i></button>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="setting-group-${key.replace(/[^a-zA-Z0-9]/g, '-')}"></div>`;
@@ -1459,12 +1488,33 @@
             container.innerHTML = '';
             // 【功能4】过滤掉隐藏目录的词条
             const hiddenIds = this.data.settings?.hiddenCategory?.entries || [];
-            const settings = this.data.entries.filter(e => {
+            let settings = this.data.entries.filter(e => {
                 if (e.type !== 'non-character') return false;
                 if (hiddenIds.includes(e.id)) return false;
                 if (type.startsWith('custom-') && e.settingType === 'custom') return e.customSettingType === type.replace('custom-', '');
                 return e.settingType === type;
             });
+
+            // 【功能3】应用 categoryDisplay 显示配置：排序 + 隐藏
+            const catKey = type;
+            const displayCfg = this.data.settings?.settingConfig?.categoryDisplay?.[catKey] || {};
+            const displayOrder = displayCfg.displayOrder || [];
+            const homeHidden = displayCfg.homeHidden || [];
+
+            // 按 displayOrder 排序
+            if (displayOrder.length > 0) {
+                settings.sort((a, b) => {
+                    const ia = displayOrder.indexOf(a.id);
+                    const ib = displayOrder.indexOf(b.id);
+                    if (ia >= 0 && ib >= 0) return ia - ib;
+                    if (ia >= 0) return -1;
+                    if (ib >= 0) return 1;
+                    return 0;
+                });
+            }
+
+            // 过滤隐藏的
+            settings = settings.filter(e => !homeHidden.includes(e.id));
 
             const wrapper = document.createElement('div');
             wrapper.className = 'h-full overflow-y-auto p-4 fade-in';
@@ -1475,18 +1525,6 @@
                 <button onclick="app.router('non-characters')" class="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"><i class="fa-solid fa-arrow-left"></i> 返回设定</button>
                 <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2"><i class="fa-solid ${this.getSettingTypeIcon(type.replace('custom-', ''))} text-indigo-600"></i>${groupTitle}<span class="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">${settings.length}个</span></h2>`;
             wrapper.appendChild(header);
-
-            // 【功能3】编辑模式下显示词条排序/隐藏管理入口
-            if (this.data.currentMode === 'edit') {
-                const editBar = document.createElement('div');
-                editBar.className = 'max-w-7xl mx-auto mb-4 flex gap-2';
-                const catKey = type.startsWith('custom-') ? type : (type === 'custom' ? 'custom-' + groupTitle : type);
-                editBar.innerHTML = `
-                    <button onclick="app.showCategoryEntryConfig('${catKey}')" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs hover:bg-indigo-100 transition"><i class="fa-solid fa-sliders mr-1"></i>排序与隐藏</button>
-                    <button onclick="app.showSettingCategoryManager()" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200 transition"><i class="fa-solid fa-folder-tree mr-1"></i>目录管理</button>
-                `;
-                wrapper.appendChild(editBar);
-            }
 
             const grid = document.createElement('div');
             grid.className = 'max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20';
