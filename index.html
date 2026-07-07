@@ -1387,6 +1387,18 @@
                 <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2"><i class="fa-solid ${this.getSettingTypeIcon(type.replace('custom-', ''))} text-indigo-600"></i>${groupTitle}<span class="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">${settings.length}个</span></h2>`;
             wrapper.appendChild(header);
 
+            // 【功能3】编辑模式下显示词条排序/隐藏管理入口
+            if (this.data.currentMode === 'edit') {
+                const editBar = document.createElement('div');
+                editBar.className = 'max-w-7xl mx-auto mb-4 flex gap-2';
+                const catKey = type.startsWith('custom-') ? type : (type === 'custom' ? 'custom-' + groupTitle : type);
+                editBar.innerHTML = `
+                    <button onclick="app.showCategoryEntryConfig('${catKey}')" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs hover:bg-indigo-100 transition"><i class="fa-solid fa-sliders mr-1"></i>排序与隐藏</button>
+                    <button onclick="app.showSettingCategoryManager()" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200 transition"><i class="fa-solid fa-folder-tree mr-1"></i>目录管理</button>
+                `;
+                wrapper.appendChild(editBar);
+            }
+
             const grid = document.createElement('div');
             grid.className = 'max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20';
             if (settings.length === 0) {
