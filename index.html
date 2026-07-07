@@ -109,10 +109,29 @@
         .synopsis-tooltip-content { font-size: 14px; line-height: 1.8; color: #4b5563; margin-bottom: 16px; }
 
         /* ========== 关系图谱 ========== */
-        .graph-container { position: relative; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); cursor: grab; }
+        .graph-container { position: relative; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+        .graph-container * { user-select: none; -webkit-user-select: none; touch-action: none; }
         .graph-container:active { cursor: grabbing; }
         .graph-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
         .graph-nodes { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+
+        /* ========== 【功能4】隐藏词条详情页：黑底白字 ========== */
+        .hidden-entry-detail { background-color: #000 !important; color: #fff !important; }
+        .hidden-entry-detail h1, .hidden-entry-detail h2, .hidden-entry-detail h3, .hidden-entry-detail h4 { color: #fff !important; border-color: #333 !important; }
+        .hidden-entry-detail p, .hidden-entry-detail .prose { color: #e5e5e5 !important; }
+        .hidden-entry-detail .text-gray-600, .hidden-entry-detail .text-gray-500, .hidden-entry-detail .text-gray-400 { color: #aaa !important; }
+        .hidden-entry-detail .text-gray-900, .hidden-entry-detail .text-gray-800, .hidden-entry-detail .text-gray-700 { color: #fff !important; }
+        .hidden-entry-detail .bg-gray-50, .hidden-entry-detail .bg-gray-100 { background-color: #111 !important; }
+        .hidden-entry-detail .bg-white, .hidden-entry-detail [class*="bg-white"] { background-color: #111 !important; }
+        .hidden-entry-detail .border-gray-200, .hidden-entry-detail .border-gray-300 { border-color: #333 !important; }
+        .hidden-entry-detail .prose { color: #e5e5e5 !important; }
+        .hidden-entry-detail a { color: #818cf8 !important; }
+        .hidden-entry-detail img { filter: brightness(0.85); }
+        .hidden-entry-detail [class*="sticky"] { background: #000 !important; background-color: #000 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; border-bottom-color: #333 !important; }
+        .hidden-entry-detail [class*="sticky"] * { color: #ccc !important; }
+        .hidden-entry-detail [class*="sticky"] button:hover, .hidden-entry-detail [class*="sticky"] button:hover * { color: #fff !important; }
+        .hidden-entry-detail [class*="sticky"] [class*="bg-"] { background-color: #1a1a1a !important; border-color: #444 !important; }
+        .hidden-entry-detail [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
         .graph-controls { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
         .graph-control-btn { width: 40px; height: 40px; border-radius: 50%; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
         .graph-control-btn:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -663,10 +682,68 @@
             if (this.data.settings?.customFont) {
                 document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
             }
+            // 【修复】从localStorage缓存恢复图片data URL（同一浏览器访问过本地版时可用）
+            this._restoreImagesFromLocalCache();
             this.hideLoadingState();
             this.setupUI();
             this.router('home');
             this.initKeyboardListeners();
+        },
+
+        // 【修复】从localStorage图片缓存恢复data URL（GitHub版没有OPFS，依赖localStorage缓存）
+        _restoreImagesFromLocalCache() {
+            try {
+                const imageCache = {};
+                // 尝试读取新格式分片缓存
+                const chunkCount = localStorage.getItem('novelWiki_img_count');
+                if (chunkCount) {
+                    for (let i = 0; i < parseInt(chunkCount); i++) {
+                        const chunkStr = localStorage.getItem(`novelWiki_img_${i}`);
+                        if (chunkStr) Object.assign(imageCache, JSON.parse(chunkStr));
+                    }
+                } else {
+                    // 回退：尝试旧格式
+                    const oldCache = localStorage.getItem('novelWiki_imageCache_v1');
+                    if (oldCache) Object.assign(imageCache, JSON.parse(oldCache));
+                }
+                if (Object.keys(imageCache).length === 0) return;
+                // 恢复剧情梗概图片
+                if (this.data.synopsis) {
+                    this.data.synopsis.forEach(chapter => {
+                        if (chapter.image && chapter.image.startsWith('{{IMG:')) {
+                            const match = chapter.image.match(/\{\{IMG:(.+?)\}\}/);
+                            if (match && imageCache[match[1]]) {
+                                chapter.image = imageCache[match[1]];
+                            }
+                        }
+                    });
+                }
+                // 恢复词条图片
+                if (this.data.entries) {
+                    this.data.entries.forEach(entry => {
+                        if (entry.versions) {
+                            entry.versions.forEach(v => {
+                                if (v.image && v.image.startsWith('{{IMG:')) {
+                                    const match = v.image.match(/\{\{IMG:(.+?)\}\}/);
+                                    if (match && imageCache[match[1]]) v.image = imageCache[match[1]];
+                                }
+                                if (v.images) {
+                                    Object.keys(v.images).forEach(key => {
+                                        const val = v.images[key];
+                                        if (val && val.startsWith('{{IMG:')) {
+                                            const match = val.match(/\{\{IMG:(.+?)\}\}/);
+                                            if (match && imageCache[match[1]]) v.images[key] = imageCache[match[1]];
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+                console.log('[Wiki] 从localStorage缓存恢复了', Object.keys(imageCache).length, '张图片');
+            } catch (e) {
+                console.warn('[Wiki] localStorage图片缓存恢复失败:', e.message);
+            }
         },
 
         // 【新增】延迟非关键操作（about.json 加载、事件监听等）
@@ -1009,6 +1086,12 @@
             const container = document.getElementById('main-container');
             container.innerHTML = '';
 
+            // 【功能4】离开详情页时清除隐藏词条黑底白字状态
+            if (view !== 'detail') {
+                this.data._currentHiddenEntryId = null;
+                container.classList.remove('hidden-entry-detail');
+            }
+
             // 更新底部导航高亮
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 const target = btn.dataset.target;
@@ -1281,7 +1364,10 @@
             container.appendChild(clone);
             wrapper.className = 'max-w-7xl mx-auto pb-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4';
 
-            const settings = this.data.entries.filter(e => e.type === 'non-character');
+            // 【功能4】过滤掉隐藏目录的词条（查看模式下隐藏）
+            const hiddenIds = this.data.settings?.hiddenCategory?.entries || [];
+            const allSettings = this.data.entries.filter(e => e.type === 'non-character');
+            const settings = allSettings.filter(e => !hiddenIds.includes(e.id));
             if (countBadge) countBadge.textContent = settings.length;
 
             if (settings.length === 0) {
@@ -1371,8 +1457,11 @@
             const container = document.getElementById('main-container');
             if (!container) return;
             container.innerHTML = '';
+            // 【功能4】过滤掉隐藏目录的词条
+            const hiddenIds = this.data.settings?.hiddenCategory?.entries || [];
             const settings = this.data.entries.filter(e => {
                 if (e.type !== 'non-character') return false;
+                if (hiddenIds.includes(e.id)) return false;
                 if (type.startsWith('custom-') && e.settingType === 'custom') return e.customSettingType === type.replace('custom-', '');
                 return e.settingType === type;
             });
@@ -1419,6 +1508,15 @@
             if (!entry) {
                 container.innerHTML = '<div class="p-4 text-red-600">你要找的东西好像消失惹~（条目不存在或已被删除）</div>';
                 return;
+            }
+
+            // 【功能4】隐藏词条：详情页黑底白字
+            const hiddenCfg = this.data.settings?.hiddenCategory;
+            const isHiddenEntry = hiddenCfg?.entries?.includes(entry.id);
+            if (isHiddenEntry) {
+                container.classList.add('hidden-entry-detail');
+            } else {
+                container.classList.remove('hidden-entry-detail');
             }
 
             // 【新增】正文词条特殊处理
@@ -1760,6 +1858,63 @@
             return div.innerHTML;
         },
 
+        // 【功能4】显示密码输入对话框（黑底白字风格，GitHub只读版）
+        showPasswordDialog(hint, onSuccess, onCancel, errorMessage, entryName, entryId) {
+            document.querySelectorAll('.pw-dialog-overlay').forEach(el => el.remove());
+            const overlay = document.createElement('div');
+            overlay.className = 'pw-dialog-overlay fixed inset-0 bg-black z-[9999] flex items-center justify-center p-4 fade-in';
+            const errorHtml = errorMessage ? `<div class="text-red-400 text-sm mb-4 text-center animate-pulse"><i class="fa-solid fa-circle-exclamation mr-1"></i>${errorMessage}</div>` : '';
+            const nameHtml = entryName ? `<div class="text-white font-bold text-lg mb-1">${app.escapeHtml(entryName)}</div>` : '';
+            overlay.innerHTML = `
+                <div class="w-full max-w-sm">
+                    <div class="text-center mb-8">
+                        <div class="w-14 h-14 rounded-full border-2 border-gray-600 flex items-center justify-center mx-auto mb-4">
+                            <i class="fa-solid fa-lock text-gray-400 text-xl"></i>
+                        </div>
+                        ${nameHtml}
+                        <div class="text-gray-500 text-sm mb-1">该词条已锁定</div>
+                        <div class="text-gray-400 text-xs">请根据要求输入口令</div>
+                    </div>
+                    ${hint ? `<div class="text-gray-300 text-sm mb-3 text-center"><i class="fa-solid fa-circle-question mr-1 text-gray-500"></i>${app.escapeHtml(hint)}</div>` : ''}
+                    ${errorHtml}
+                    <input type="text" id="pw-input" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white mb-4 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none placeholder-gray-600" placeholder="输入口令..." autocomplete="off">
+                    <div class="flex gap-3">
+                        <button id="pw-cancel" class="flex-1 py-2.5 border border-gray-700 text-gray-400 rounded-lg hover:bg-gray-900 hover:text-gray-200 transition text-sm">返回</button>
+                        <button id="pw-submit" class="flex-1 py-2.5 bg-gray-100 text-black rounded-lg hover:bg-white transition text-sm font-medium">确认</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            const input = overlay.querySelector('#pw-input');
+            input.focus();
+            const submit = () => {
+                const val = input.value.trim();
+                if (!val) {
+                    const existingError = overlay.querySelector('.pw-empty-error');
+                    if (!existingError) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'pw-empty-error text-red-400 text-sm mb-4 text-center animate-pulse';
+                        errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>请输入口令后再确认';
+                        input.parentNode.insertBefore(errorDiv, input);
+                    }
+                    input.focus();
+                    return;
+                }
+                overlay.remove();
+                onSuccess(val);
+            };
+            overlay.querySelector('#pw-submit').onclick = submit;
+            input.onkeydown = (e) => {
+                if (e.key !== 'Enter') {
+                    const emptyError = overlay.querySelector('.pw-empty-error');
+                    if (emptyError) emptyError.remove();
+                }
+                if (e.key === 'Enter') submit();
+            };
+            overlay.querySelector('#pw-cancel').onclick = () => { overlay.remove(); onCancel && onCancel(); };
+            overlay.onclick = (e) => { if (e.target === overlay) {} };
+        },
+
         stripHtml(html) {
             if (!html) return '';
             const tmp = document.createElement('div');
@@ -2023,6 +2178,69 @@
         openEntry(entryId, versionId) {
             const entry = this.data.entries.find(e => e.id === entryId);
             if (!entry) return;
+
+            // 【功能4】检查隐藏目录密码（GitHub只读版，每个词条独立）
+            const hiddenCfg = this.data.settings?.hiddenCategory;
+            const isHidden = hiddenCfg?.entries?.includes(entry.id);
+            this.data._currentHiddenEntryId = isHidden ? entry.id : null;
+            if (isHidden) {
+                const pwCfg = hiddenCfg?.entryPasswords?.[entry.id];
+                if (pwCfg && pwCfg.answers && pwCfg.answers.length > 0) {
+                    const pwKey = 'hidden_pw_' + entry.id;
+                    const canSkip = pwCfg.alwaysRequired === false && sessionStorage.getItem(pwKey) === 'ok';
+                    if (!canSkip && this._pwCheckingEntryId !== entry.id) {
+                        if (app.showPasswordDialog) {
+                            this._pwCheckingEntryId = entry.id;
+                            const visibleVersion = this.getVisibleVersion(entry);
+                            const entryName = visibleVersion ? visibleVersion.title : entry.code;
+                            const returnView = this.data.currentView;
+                            const tryPassword = (answer) => {
+                                if (!answer || answer.trim() === '') {
+                                    app.showPasswordDialog(pwCfg.hint || '请输入密码', tryPassword, () => {
+                                        this._pwCheckingEntryId = null;
+                                        this._returnFromPasswordLock(returnView, entry);
+                                    }, '请输入口令后再确认', entryName, entry.id);
+                                    return;
+                                }
+                                const isCorrect = pwCfg.answers.some(a => a.trim() === answer.trim());
+                                if (isCorrect) {
+                                    sessionStorage.setItem(pwKey, 'ok');
+                                    this._pwCheckingEntryId = null;
+                                    this._clearPasswordLock();
+                                    this._openEntryInternal(entryId, versionId);
+                                } else {
+                                    let errorMsg = pwCfg.defaultMessage || '不对啦！';
+                                    if (pwCfg.rules) {
+                                        for (const rule of pwCfg.rules) {
+                                            if (rule.condition === 'equals' && answer.trim() === rule.answer) { errorMsg = rule.message; break; }
+                                            else if (rule.condition === 'includes' && answer.includes(rule.answer)) { errorMsg = rule.message; break; }
+                                        }
+                                    }
+                                    app.showPasswordDialog(pwCfg.hint || '请输入密码', tryPassword, () => {
+                                        this._pwCheckingEntryId = null;
+                                        this._returnFromPasswordLock(returnView, entry);
+                                    }, errorMsg, entryName, entry.id);
+                                }
+                            };
+                            this._showPasswordLock(entryName);
+                            app.showPasswordDialog(pwCfg.hint || '请输入密码', tryPassword, () => {
+                                this._pwCheckingEntryId = null;
+                                this._returnFromPasswordLock(returnView, entry);
+                            }, null, entryName, entry.id);
+                            return;
+                        }
+                    }
+                }
+            } else {
+                this._pwCheckingEntryId = null;
+            }
+            this._openEntryInternal(entryId, versionId);
+        },
+
+        // 【功能4】openEntry 的内部逻辑（提取出来供密码检查通过后调用）
+        _openEntryInternal(entryId, versionId) {
+            const entry = this.data.entries.find(e => e.id === entryId);
+            if (!entry) return;
             // 【回到xx】记录来源词条（进入新词条前记录当前词条）
             this._recordPreviousEntry();
             this.data.editingId = entryId;
@@ -2037,6 +2255,37 @@
 
         openEntryWithVersion(entryId, versionId) {
             this.openEntry(entryId, versionId);
+        },
+
+        // ==================== 隐藏词条密码保护（GitHub只读版） ====================
+        _showPasswordLock(entryName) {
+            this._clearPasswordLock();
+            const lock = document.createElement('div');
+            lock.id = 'password-lock-overlay';
+            lock.className = 'fixed inset-0 bg-black z-[9998] flex flex-col items-center justify-center text-white';
+            lock.innerHTML = `
+                <div class="text-center">
+                    <div class="text-6xl mb-6"><i class="fa-solid fa-lock text-gray-600"></i></div>
+                    <div class="text-xl font-bold text-gray-300 mb-2">${app.escapeHtml(entryName)}</div>
+                    <div class="text-sm text-gray-500">该内容已被锁定</div>
+                </div>
+            `;
+            document.body.appendChild(lock);
+        },
+
+        _clearPasswordLock() {
+            const lock = document.getElementById('password-lock-overlay');
+            if (lock) lock.remove();
+        },
+
+        _returnFromPasswordLock(returnView, entry) {
+            this._clearPasswordLock();
+            this.data._currentHiddenEntryId = null;
+            if (returnView && returnView !== 'detail') {
+                this.router(returnView);
+            } else {
+                this.router(entry?.type === 'non-character' ? 'non-characters' : 'characters');
+            }
         },
 
         goBackFromDetail() {
@@ -2139,40 +2388,75 @@
         initGraphPan() {
             const container = document.getElementById('graph-container');
             if (!container) return;
-            let isPanning = false, startX, startY;
+            let isMouseDown = false;
+            let isPanning = false;
+            let startX, startY, downX, downY;
+            const PAN_THRESHOLD = 3;
+
             container.addEventListener('mousedown', (e) => {
-                if (e.target.id === 'graph-container' || e.target.id === 'graph-svg' || e.target.id === 'graph-nodes') {
-                    isPanning = true;
-                    startX = e.clientX - (this.data.graphState.translateX || 0);
-                    startY = e.clientY - (this.data.graphState.translateY || 0);
-                    container.style.cursor = 'grabbing';
-                    e.preventDefault();
-                }
+                // 排除 info-panel、工具栏、导航栏
+                if (e.target.closest('#graph-info-panel')) return;
+                if (e.target.closest('nav') || e.target.closest('header')) return;
+                isMouseDown = true;
+                isPanning = false;
+                downX = e.clientX;
+                downY = e.clientY;
+                startX = e.clientX - (this.data.graphState.translateX || 0);
+                startY = e.clientY - (this.data.graphState.translateY || 0);
+                e.preventDefault();
             });
             document.addEventListener('mousemove', (e) => {
-                if (!isPanning) return;
+                if (!isMouseDown) return;
+                if (!isPanning) {
+                    const dx = Math.abs(e.clientX - downX);
+                    const dy = Math.abs(e.clientY - downY);
+                    if (dx > PAN_THRESHOLD || dy > PAN_THRESHOLD) {
+                        isPanning = true;
+                        container.style.cursor = 'grabbing';
+                    } else { return; }
+                }
                 this.data.graphState.translateX = e.clientX - startX;
                 this.data.graphState.translateY = e.clientY - startY;
                 this.applyGraphTransform();
             });
-            document.addEventListener('mouseup', () => {
-                if (isPanning) { isPanning = false; container.style.cursor = 'grab'; }
-            });
-            // Touch support for mobile
-            container.addEventListener('touchstart', (e) => {
-                if (e.target.id === 'graph-container' || e.target.id === 'graph-svg' || e.target.id === 'graph-nodes') {
-                    isPanning = true;
-                    startX = e.touches[0].clientX - (this.data.graphState.translateX || 0);
-                    startY = e.touches[0].clientY - (this.data.graphState.translateY || 0);
+            document.addEventListener('mouseup', (e) => {
+                if (!isMouseDown) return;
+                isMouseDown = false;
+                if (isPanning) {
+                    isPanning = false;
+                    container.style.cursor = 'grab';
+                    // 阻止拖拽产生的 click 误触发节点选中
+                    const suppressClick = (ce) => {
+                        if (ce.target.closest('#graph-container')) {
+                            ce.stopPropagation();
+                        }
+                        document.removeEventListener('click', suppressClick, true);
+                    };
+                    setTimeout(() => document.addEventListener('click', suppressClick, true), 0);
                 }
+            });
+            // Touch support
+            let isTouchPanning = false;
+            let touchStartX, touchStartY;
+            container.addEventListener('touchstart', (e) => {
+                if (e.target.closest('#graph-info-panel')) return;
+                if (e.target.closest('nav') || e.target.closest('header')) return;
+                if (e.touches.length !== 1) return;
+                isTouchPanning = true;
+                touchStartX = e.touches[0].clientX - (this.data.graphState.translateX || 0);
+                touchStartY = e.touches[0].clientY - (this.data.graphState.translateY || 0);
             }, { passive: true });
-            document.addEventListener('touchmove', (e) => {
-                if (!isPanning) return;
-                this.data.graphState.translateX = e.touches[0].clientX - startX;
-                this.data.graphState.translateY = e.touches[0].clientY - startY;
+            // 【修复】容器级别 touchmove 使用 passive:false，阻止页面滚动
+            container.addEventListener('touchmove', (e) => {
+                if (!isTouchPanning) return;
+                if (e.touches.length !== 1) { isTouchPanning = false; return; }
+                e.preventDefault();
+                this.data.graphState.translateX = e.touches[0].clientX - touchStartX;
+                this.data.graphState.translateY = e.touches[0].clientY - touchStartY;
                 this.applyGraphTransform();
-            }, { passive: true });
-            document.addEventListener('touchend', () => { isPanning = false; });
+            }, { passive: false });
+            container.addEventListener('touchend', () => { isTouchPanning = false; });
+            container.addEventListener('touchcancel', () => { isTouchPanning = false; });
         },
 
         togglePanelCollapse() {
