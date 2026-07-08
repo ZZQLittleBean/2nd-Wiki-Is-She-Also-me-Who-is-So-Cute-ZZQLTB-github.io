@@ -189,6 +189,19 @@
         /* 图片加载失败控制（避免onerror中JS引号冲突） */
         .event-img-failed { display: none !important; }
         .event-img-failed + .event-img-fail-msg { display: flex !important; }
+
+        /* ========== 首页分栏布局 ========== */
+        .home-multi-col-1 { display: block; }
+        .home-multi-col-2 { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .home-multi-col-3 { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        @media (min-width: 768px) {
+            .home-multi-col-2 { grid-template-columns: 1fr 1fr; }
+            .home-multi-col-3 { grid-template-columns: 1fr 1fr 1fr; }
+        }
+        .home-col-item { break-inside: avoid; margin-bottom: 1rem; }
+        .home-col-btn { background: white; border-color: #d1d5db; color: #6b7280; }
+        .home-col-btn:hover { border-color: #4f46e5; color: #4f46e5; }
+        .home-col-btn.active { background: #4f46e5; border-color: #4f46e5; color: white; }
     </style>
 </head>
 <body class="h-screen flex flex-col text-gray-800">
@@ -260,9 +273,16 @@
     <!-- 首页模板 -->
     <template id="tpl-home">
         <div class="h-full overflow-y-auto p-4 fade-in">
-            <div class="max-w-3xl mx-auto space-y-6 pb-20">
-                <!-- 活动页窗口：当前上线的活动 -->
-                <div id="active-event-banner" class="hidden">
+            <!-- 列数选择器 -->
+            <div id="home-column-control" class="flex items-center justify-end gap-1 mb-2 hidden">
+                <span class="text-[10px] text-gray-400 mr-1">分栏</span>
+                <button onclick="app.setHomeColumns(1)" data-cols="1" class="home-col-btn w-6 h-6 rounded text-[10px] border transition" title="1列"><i class="fa-solid fa-square"></i></button>
+                <button onclick="app.setHomeColumns(2)" data-cols="2" class="home-col-btn w-6 h-6 rounded text-[10px] border transition" title="2列"><i class="fa-solid fa-columns"></i></button>
+                <button onclick="app.setHomeColumns(3)" data-cols="3" class="home-col-btn w-6 h-6 rounded text-[10px] border transition" title="3列"><i class="fa-solid fa-table-cells"></i></button>
+            </div>
+            <!-- 多列容器：所有首页组件参与分栏 -->
+            <div id="home-multi-col-container" class="home-multi-col-1">
+                <div id="active-event-banner" class="hidden home-col-item">
                     <div class="active-event-banner" onclick="app.openActiveEvent()">
                         <img id="active-event-image" class="active-event-bg" src="" alt="">
                         <div class="active-event-overlay"></div>
@@ -274,8 +294,7 @@
                         <div id="active-event-dots" class="active-event-dots"></div>
                     </div>
                 </div>
-
-                <div id="announcement-section" class="hidden">
+                <div id="announcement-section" class="hidden home-col-item">
                     <div class="announcement-banner" onclick="app.viewAnnouncement()">
                         <div class="flex items-center gap-2 mb-2"><i class="fa-solid fa-bullhorn"></i><span class="font-bold text-sm">最新公告</span></div>
                         <h3 id="announcement-title" class="text-lg font-bold mb-1"></h3>
@@ -283,19 +302,19 @@
                         <p id="announcement-meta" class="text-xs opacity-75 mt-2 flex items-center gap-2"></p>
                     </div>
                 </div>
-                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden home-col-item">
                     <div class="absolute top-0 right-0 opacity-10 transform translate-x-10 -translate-y-10"><i class="fa-solid fa-dragon text-9xl"></i></div>
                     <h2 id="welcome-title" class="text-2xl font-bold mb-2 relative z-10">欢迎来到 Wiki</h2>
                     <p id="welcome-subtitle" class="opacity-90 mb-4 text-sm relative z-10">探索角色、世界观与错综复杂的关系网。</p>
                 </div>
-                <div onclick="app.router('synopsis')" class="synopsis-home-entry flex items-center justify-between p-4">
+                <div onclick="app.router('synopsis')" class="synopsis-home-entry flex items-center justify-between p-4 home-col-item">
                     <div class="flex items-center gap-4">
                         <div class="w-11 h-11 rounded-xl bg-white flex items-center justify-center text-2xl text-amber-600" style="margin-bottom:0;"><i class="fa-solid fa-film"></i></div>
                         <div><div class="text-amber-800 font-bold text-base mb-1">剧情梗概</div><div class="text-amber-700 text-xs">查看完整故事线</div></div>
                     </div>
                     <i class="fa-solid fa-chevron-right text-amber-600 text-lg"></i>
                 </div>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-3 gap-3 home-col-item">
                     <div onclick="app.router('characters')" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center gap-2 active:scale-95 transition cursor-pointer">
                         <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg"><i class="fa-solid fa-user-astronaut"></i></div>
                         <span class="font-medium text-gray-700 text-xs">角色</span>
@@ -309,9 +328,7 @@
                         <span class="font-medium text-gray-700 text-xs">关系</span>
                     </div>
                 </div>
-
-                <!-- 查看全部活动入口 -->
-                <div onclick="app.router('events')" class="bg-gradient-to-r from-rose-50 to-pink-50 p-3 rounded-xl shadow-sm border border-rose-200 flex items-center justify-between active:scale-95 transition cursor-pointer">
+                <div onclick="app.router('events')" class="bg-gradient-to-r from-rose-50 to-pink-50 p-3 rounded-xl shadow-sm border border-rose-200 flex items-center justify-between active:scale-95 transition cursor-pointer home-col-item">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-lg"><i class="fa-solid fa-calendar-star"></i></div>
                         <div>
@@ -321,13 +338,12 @@
                     </div>
                     <i class="fa-solid fa-chevron-right text-rose-400"></i>
                 </div>
-                <div id="home-content-area" class="space-y-3"></div>
-                <div id="history-section" class="hidden">
+                <div id="home-content-area" class="space-y-3 home-col-item"></div>
+                <div id="history-section" class="hidden home-col-item">
                     <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>最近浏览</h3>
                     <div id="history-list" class="space-y-2"></div>
                 </div>
             </div>
-            <!-- 【硬编码提示文字 - 可修改位置】 -->
             <div class="text-center py-6">
                 <p class="text-xs text-gray-400">测试版本，请以实际为准</p>
             </div>
@@ -1129,6 +1145,8 @@
 
         // ==================== 路由 ====================
         router(view, skipHistory = false) {
+            // 【关键修复】离开首页时停止活动窗口自动轮播
+            if (view !== 'home' && this._stopHomeBannerAutoPlay) this._stopHomeBannerAutoPlay();
             this.data.currentView = view;
             const container = document.getElementById('main-container');
             // 【修复】防御性检查：确保 container 存在
@@ -1250,6 +1268,9 @@
             // 【新增】渲染活动窗口
             this.renderHomeEventBanner(clone);
 
+            // 【新增】初始化首页分栏
+            this.initHomeColumnControl();
+
             container.appendChild(clone);
         },
 
@@ -1318,7 +1339,12 @@
             if (!bannerEl) return;
             if (activeEvents.length === 0) { bannerEl.classList.add('hidden'); return; }
             bannerEl.classList.remove('hidden');
-            const currentEvent = activeEvents[0];
+            // 恢复轮播索引
+            let currentIdx = this._homeBannerIndex || 0;
+            if (currentIdx >= activeEvents.length) currentIdx = 0;
+            this._homeBannerIndex = currentIdx;
+            this._homeBannerEvents = activeEvents;
+            const currentEvent = activeEvents[currentIdx];
             const version = this.getVisibleVersion(currentEvent) || currentEvent.versions[0];
             const titleEl = container.querySelector('#active-event-title');
             const descEl = container.querySelector('#active-event-desc');
@@ -1326,23 +1352,89 @@
             const dotsEl = container.querySelector('#active-event-dots');
             if (titleEl) titleEl.textContent = version?.title || currentEvent.code;
             if (descEl) descEl.textContent = version?.subtitle || '';
+            // 【关键修复】支持dataUrl、http、本地文件夹路径（/wiki-images/）
             let headerImg = currentEvent.headerImage || '';
             headerImg = this.resolveImageUrl(headerImg);
+            const isLoadable = headerImg && (headerImg.startsWith('data:') || headerImg.startsWith('http') || headerImg.includes('/wiki-images/'));
             if (imgEl) {
-                if (headerImg && (headerImg.startsWith('data:') || headerImg.startsWith('http'))) {
-                    imgEl.src = headerImg; imgEl.classList.remove('hidden');
-                } else { imgEl.src = ''; imgEl.classList.add('hidden'); }
+                if (isLoadable) { imgEl.src = headerImg; imgEl.classList.remove('hidden'); }
+                else { imgEl.src = ''; imgEl.classList.add('hidden'); }
             }
             if (dotsEl) {
                 dotsEl.innerHTML = '';
                 activeEvents.forEach((_, idx) => {
                     const dot = document.createElement('div');
-                    dot.className = 'active-event-dot ' + (idx === 0 ? 'active' : '');
+                    dot.className = 'active-event-dot ' + (idx === currentIdx ? 'active' : '');
+                    dot.onclick = (e) => { e.stopPropagation(); this._switchHomeBanner(idx); };
                     dotsEl.appendChild(dot);
                 });
             }
             const bannerDiv = bannerEl.querySelector('.active-event-banner');
-            if (bannerDiv) bannerDiv.onclick = () => this.openEntry(currentEvent.id);
+            if (bannerDiv) {
+                bannerDiv.onclick = () => {
+                    const evts = this._homeBannerEvents || activeEvents;
+                    const idx = this._homeBannerIndex || 0;
+                    if (evts[idx]) this.openEntry(evts[idx].id);
+                };
+            }
+            this._startHomeBannerAutoPlay();
+        },
+
+        _switchHomeBanner(index) {
+            const events = this._homeBannerEvents;
+            if (!events || !events[index]) return;
+            this._homeBannerIndex = index;
+            const event = events[index];
+            const version = this.getVisibleVersion(event) || event.versions[0];
+            const titleEl = document.getElementById('active-event-title');
+            const descEl = document.getElementById('active-event-desc');
+            const imgEl = document.getElementById('active-event-image');
+            const dots = document.querySelectorAll('.active-event-dot');
+            if (titleEl) titleEl.textContent = version?.title || event.code;
+            if (descEl) descEl.textContent = version?.subtitle || '';
+            if (imgEl) {
+                const imgRef = event.headerImage || '';
+                const url = this.resolveImageUrl(imgRef);
+                const isLoadable = url && (url.startsWith('data:') || url.startsWith('http') || url.includes('/wiki-images/'));
+                imgEl.src = isLoadable ? url : '';
+            }
+            dots.forEach((d, i) => d.classList.toggle('active', i === index));
+        },
+
+        _startHomeBannerAutoPlay() {
+            if (this._bannerAutoPlayTimer) clearInterval(this._bannerAutoPlayTimer);
+            const events = this._homeBannerEvents;
+            if (!events || events.length <= 1) return;
+            this._bannerAutoPlayTimer = setInterval(() => {
+                const nextIdx = ((this._homeBannerIndex || 0) + 1) % events.length;
+                this._switchHomeBanner(nextIdx);
+            }, 5000);
+        },
+
+        _stopHomeBannerAutoPlay() {
+            if (this._bannerAutoPlayTimer) { clearInterval(this._bannerAutoPlayTimer); this._bannerAutoPlayTimer = null; }
+        },
+
+        // ========== 首页分栏控制 ==========
+        setHomeColumns(cols) {
+            cols = parseInt(cols) || 1;
+            if (cols < 1) cols = 1;
+            if (cols > 3) cols = 3;
+            const container = document.getElementById('home-multi-col-container');
+            if (container) container.className = 'home-multi-col-' + cols;
+            document.querySelectorAll('.home-col-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.cols) === cols);
+            });
+            try { localStorage.setItem('novelWiki_homeColumns', String(cols)); } catch(e) {}
+        },
+
+        initHomeColumnControl() {
+            const control = document.getElementById('home-column-control');
+            if (!control) return;
+            control.classList.remove('hidden');
+            let cols = 1;
+            try { const saved = localStorage.getItem('novelWiki_homeColumns'); if (saved) cols = parseInt(saved) || 1; } catch(e) {}
+            this.setHomeColumns(cols);
         },
 
         openActiveEvent() {
