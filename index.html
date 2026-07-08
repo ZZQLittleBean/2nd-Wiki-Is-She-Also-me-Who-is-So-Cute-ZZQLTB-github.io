@@ -697,10 +697,10 @@
             this.initKeyboardListeners();
         },
 
-        // 【修复】从localStorage图片缓存恢复data URL，并清除跨域无效的blob URL
+        // 【修复】从localStorage图片缓存恢复data URL，并处理各种图片格式
         _restoreImagesFromLocalCache() {
             try {
-                // 1. 读取 localStorage 图片缓存（同一浏览器访问过本地版时有效）
+                // 1. 读取 localStorage 图片缓存
                 const imageCache = {};
                 const chunkCount = localStorage.getItem('novelWiki_img_count');
                 if (chunkCount) {
@@ -708,75 +708,52 @@
                         const chunkStr = localStorage.getItem(`novelWiki_img_${i}`);
                         if (chunkStr) Object.assign(imageCache, JSON.parse(chunkStr));
                     }
-                } else {
-                    const oldCache = localStorage.getItem('novelWiki_imageCache_v1');
-                    if (oldCache) Object.assign(imageCache, JSON.parse(oldCache));
                 }
+                const oldCache = localStorage.getItem('novelWiki_imageCache_v1');
+                if (oldCache) Object.assign(imageCache, JSON.parse(oldCache));
                 const hasCache = Object.keys(imageCache).length > 0;
 
-                // 2. 恢复或清理剧情梗概图片
-                let synopsisRestored = 0;
-                let synopsisCleared = 0;
-                let synopsisNeedFiles = 0;
+                // 2. 处理剧情梗概图片：{{IMG:}} → 从缓存恢复为data URL；blob: → 清空
+                let restored = 0, needFiles = 0;
                 if (this.data.synopsis) {
-                    this.data.synopsis.forEach(chapter => {
-                        const img = chapter.image || '';
+                    this.data.synopsis.forEach(ch => {
+                        const img = ch.image || '';
                         if (img.startsWith('{{IMG:')) {
-                            const match = img.match(/\{\{IMG:(.+?)\}\}/);
-                            if (match) {
-                                if (hasCache && imageCache[match[1]]) {
-                                    chapter.image = imageCache[match[1]];
-                                    synopsisRestored++;
-                                } else {
-                                    // 无缓存：保持 {{IMG:}}，需要 data/wiki-images/ 文件
-                                    synopsisNeedFiles++;
-                                }
-                            }
-                        } else if (img.startsWith('blob:')) {
-                            chapter.image = '';
-                            synopsisCleared++;
-                        }
+                            const m = img.match(/\{\{IMG:(.+?)\}\}/);
+                            if (m && hasCache && imageCache[m[1]]) {
+                                ch.image = imageCache[m[1]]; restored++;
+                            } else if (m) { needFiles++; }
+                        } else if (img.startsWith('blob:')) ch.image = '';
+                        // data: / http: 保持不变
                     });
                 }
 
-                // 3. 恢复或清理词条图片
-                let entryRestored = 0;
-                let entryCleared = 0;
+                // 3. 处理词条图片
                 if (this.data.entries) {
-                    this.data.entries.forEach(entry => {
-                        if (entry.versions) {
-                            entry.versions.forEach(v => {
-                                if (v.image && v.image.startsWith('{{IMG:')) {
-                                    const match = v.image.match(/\{\{IMG:(.+?)\}\}/);
-                                    if (match && hasCache && imageCache[match[1]]) { v.image = imageCache[match[1]]; entryRestored++; }
-                                } else if (v.image && v.image.startsWith('blob:')) { v.image = ''; entryCleared++; }
-                                if (v.images) {
-                                    Object.keys(v.images).forEach(key => {
-                                        const val = v.images[key];
-                                        if (val && val.startsWith('{{IMG:')) {
-                                            const match = val.match(/\{\{IMG:(.+?)\}\}/);
-                                            if (match && hasCache && imageCache[match[1]]) { v.images[key] = imageCache[match[1]]; entryRestored++; }
-                                        } else if (val && val.startsWith('blob:')) { v.images[key] = ''; entryCleared++; }
-                                    });
-                                }
-                            });
-                        }
+                    this.data.entries.forEach(e => {
+                        if (!e.versions) return;
+                        e.versions.forEach(v => {
+                            if (v.image && v.image.startsWith('{{IMG:')) {
+                                const m = v.image.match(/\{\{IMG:(.+?)\}\}/);
+                                if (m && hasCache && imageCache[m[1]]) v.image = imageCache[m[1]];
+                            } else if (v.image && v.image.startsWith('blob:')) v.image = '';
+                            if (v.images) {
+                                Object.keys(v.images).forEach(k => {
+                                    const val = v.images[k];
+                                    if (val && val.startsWith('{{IMG:')) {
+                                        const m = val.match(/\{\{IMG:(.+?)\}\}/);
+                                        if (m && hasCache && imageCache[m[1]]) v.images[k] = imageCache[m[1]];
+                                    } else if (val && val.startsWith('blob:')) v.images[k] = '';
+                                });
+                            }
+                        });
                     });
                 }
 
-                // 诊断日志
-                const totalRestored = synopsisRestored + entryRestored;
-                if (totalRestored > 0) {
-                    console.log('[Wiki] 从localStorage缓存恢复了', totalRestored, '张图片');
-                }
-                if (synopsisNeedFiles > 0) {
-                    console.log('[Wiki]', synopsisNeedFiles, '张剧情梗概图片需要 data/wiki-images/ 目录中的文件');
-                }
-                if (synopsisCleared + entryCleared > 0) {
-                    console.log('[Wiki] 清除了', synopsisCleared + entryCleared, '个无效的blob URL');
-                }
+                if (restored > 0) console.log('[Wiki] 从缓存恢复了', restored, '张图片');
+                if (needFiles > 0) console.log('[Wiki]', needFiles, '张图片需 data/wiki-images/ 目录');
             } catch (e) {
-                console.warn('[Wiki] localStorage图片缓存恢复失败:', e.message);
+                console.warn('[Wiki] 图片缓存恢复失败:', e.message);
             }
         },
 
