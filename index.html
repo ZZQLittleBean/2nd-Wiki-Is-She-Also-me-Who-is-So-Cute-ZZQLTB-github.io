@@ -273,15 +273,17 @@
     <!-- 首页模板 -->
     <template id="tpl-home">
         <div class="h-full overflow-y-auto p-4 fade-in">
-            <!-- 列数选择器 -->
+            <!-- 列数选择器（位于分栏容器外部顶部） -->
             <div id="home-column-control" class="flex items-center justify-end gap-1 mb-2 hidden">
                 <span class="text-[10px] text-gray-400 mr-1">分栏</span>
                 <button onclick="app.setHomeColumns(1)" data-cols="1" class="home-col-btn w-6 h-6 rounded text-[10px] border transition" title="1列"><i class="fa-solid fa-square"></i></button>
                 <button onclick="app.setHomeColumns(2)" data-cols="2" class="home-col-btn w-6 h-6 rounded text-[10px] border transition" title="2列"><i class="fa-solid fa-columns"></i></button>
                 <button onclick="app.setHomeColumns(3)" data-cols="3" class="home-col-btn w-6 h-6 rounded text-[10px] border transition" title="3列"><i class="fa-solid fa-table-cells"></i></button>
             </div>
-            <!-- 多列容器：所有首页组件参与分栏 -->
-            <div id="home-multi-col-container" class="home-multi-col-1">
+            <!-- 【关键修复】外层容器：单栏时 max-w-3xl 限制宽度，分栏时去除限制 -->
+            <div id="home-layout-container" class="max-w-3xl mx-auto space-y-6">
+                <!-- 多列容器：所有首页组件参与分栏 -->
+                <div id="home-multi-col-container" class="home-multi-col-1">
                 <div id="active-event-banner" class="hidden home-col-item">
                     <div class="active-event-banner" onclick="app.openActiveEvent()">
                         <img id="active-event-image" class="active-event-bg" src="" alt="">
@@ -343,7 +345,8 @@
                     <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>最近浏览</h3>
                     <div id="history-list" class="space-y-2"></div>
                 </div>
-            </div>
+                </div><!-- /home-multi-col-container -->
+            </div><!-- /home-layout-container -->
             <div class="text-center py-6">
                 <p class="text-xs text-gray-400">测试版本，请以实际为准</p>
             </div>
@@ -1352,12 +1355,10 @@
             const dotsEl = container.querySelector('#active-event-dots');
             if (titleEl) titleEl.textContent = version?.title || currentEvent.code;
             if (descEl) descEl.textContent = version?.subtitle || '';
-            // 【关键修复】支持dataUrl、http、本地文件夹路径（/wiki-images/）
-            let headerImg = currentEvent.headerImage || '';
-            headerImg = this.resolveImageUrl(headerImg);
-            const isLoadable = headerImg && (headerImg.startsWith('data:') || headerImg.startsWith('http') || headerImg.includes('/wiki-images/'));
+            // 【GitHub版】静态文件直接URL访问，无需异步加载机制
+            const headerImg = this.resolveImageUrl(currentEvent.headerImage || '');
             if (imgEl) {
-                if (isLoadable) { imgEl.src = headerImg; imgEl.classList.remove('hidden'); }
+                if (headerImg) { imgEl.src = headerImg; imgEl.classList.remove('hidden'); }
                 else { imgEl.src = ''; imgEl.classList.add('hidden'); }
             }
             if (dotsEl) {
@@ -1393,10 +1394,8 @@
             if (titleEl) titleEl.textContent = version?.title || event.code;
             if (descEl) descEl.textContent = version?.subtitle || '';
             if (imgEl) {
-                const imgRef = event.headerImage || '';
-                const url = this.resolveImageUrl(imgRef);
-                const isLoadable = url && (url.startsWith('data:') || url.startsWith('http') || url.includes('/wiki-images/'));
-                imgEl.src = isLoadable ? url : '';
+                // 【GitHub版】静态文件直接URL访问
+                imgEl.src = this.resolveImageUrl(event.headerImage || '');
             }
             dots.forEach((d, i) => d.classList.toggle('active', i === index));
         },
@@ -1422,6 +1421,17 @@
             if (cols > 3) cols = 3;
             const container = document.getElementById('home-multi-col-container');
             if (container) container.className = 'home-multi-col-' + cols;
+            // 【关键修复】单栏时恢复 max-w-3xl（正常左右间距），分栏时去除限制让内容更宽
+            const layoutContainer = document.getElementById('home-layout-container');
+            if (layoutContainer) {
+                if (cols === 1) {
+                    layoutContainer.classList.add('max-w-3xl');
+                    layoutContainer.style.maxWidth = '';
+                } else {
+                    layoutContainer.classList.remove('max-w-3xl');
+                    layoutContainer.style.maxWidth = '100%';
+                }
+            }
             document.querySelectorAll('.home-col-btn').forEach(btn => {
                 btn.classList.toggle('active', parseInt(btn.dataset.cols) === cols);
             });
@@ -1480,10 +1490,9 @@
             const div = document.createElement('div');
             div.className = 'event-card';
             div.onclick = () => this.openEntry(event.id);
-            let headerImg = event.headerImage || '';
-            headerImg = this.resolveImageUrl(headerImg);
-            // 【关键修复】支持dataUrl、http、本地文件夹路径（file://协议下有效）
-            const hasImage = headerImg && (headerImg.startsWith('data:') || headerImg.startsWith('http') || headerImg.includes('/wiki-images/'));
+            // 【GitHub版】静态文件直接URL访问，无需异步加载机制
+            const headerImg = this.resolveImageUrl(event.headerImage || '');
+            const hasImage = !!headerImg;
             let dateText = '';
             const dur = event.duration;
             if (!dur || dur.type === 'permanent') dateText = '常态上线';
@@ -2214,10 +2223,11 @@
             // http URL 直接返回
             if (imgRef.startsWith('http')) return imgRef;
             // {{IMG:filename}} 格式 → 转换为相对路径
+            // 【关键修复】与详情页活动词条硬编码路径保持一致：./data/wiki-images/
             if (imgRef.startsWith('{{IMG:')) {
                 const match = imgRef.match(/\{\{IMG:(.+?)\}\}/);
                 if (match && match[1]) {
-                    return `./wiki-images/${match[1]}`;
+                    return `./data/wiki-images/${match[1]}`;
                 }
             }
             return imgRef;
