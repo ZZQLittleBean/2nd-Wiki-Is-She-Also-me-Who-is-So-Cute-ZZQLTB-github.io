@@ -1831,8 +1831,8 @@
             if (!imgRef) return '';
             // dataUrl 直接返回
             if (imgRef.startsWith('data:')) return imgRef;
-            // 【修复】blob URL 在 GitHub 跨域无效，返回空字符串
-            if (imgRef.startsWith('blob:')) return '';
+            // blob URL 直接返回（浏览器内存中可能有对应对象）
+            if (imgRef.startsWith('blob:')) return imgRef;
             // http URL 直接返回
             if (imgRef.startsWith('http')) return imgRef;
             // {{IMG:filename}} 格式 → 转换为相对路径
