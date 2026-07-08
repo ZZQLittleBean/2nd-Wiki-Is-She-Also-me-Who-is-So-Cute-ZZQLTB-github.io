@@ -94,7 +94,8 @@
           "homeHidden": []
         }
       }
-    }
+    },
+    "_homeColumns": 1
   },
   "entries": [
     {
@@ -6054,6 +6055,49 @@
           "createdAt": 1783401446948
         }
       ]
+    },
+    {
+      "id": "evt-1783528472837",
+      "type": "event",
+      "code": "E-001",
+      "camp": "",
+      "settingType": null,
+      "pinned": false,
+      "pinStartChapter": null,
+      "pinEndChapter": null,
+      "pinnedVersions": {},
+      "missingIntervalVersion": null,
+      "defaultPinnedVersion": null,
+      "headerImage": "{{IMG:evt-1783528472837_v-1783528472837_header.png}}",
+      "duration": {
+        "type": "permanent"
+      },
+      "createdAt": 1783528472837,
+      "versions": [
+        {
+          "vid": "v-1783528472837",
+          "title": "Wiki新版本上线！",
+          "subtitle": "",
+          "level": 5,
+          "image": null,
+          "images": {
+            "avatar": null,
+            "card": null,
+            "cover": null
+          },
+          "chapterFrom": null,
+          "chapterTo": null,
+          "blocks": [
+            {
+              "type": "p",
+              "text": "新版本demov2.7-build1.6已上线！\n本次更新内容：\n加入了首页分栏机制；新增了活动页词条；优化了新存档的正文词条添加体验。"
+            }
+          ],
+          "relatedVersions": null,
+          "relatedCharacters": null,
+          "createdAt": 1783528472837
+        }
+      ]
     }
   ],
   "camps": [
@@ -6376,7 +6420,8 @@
   ],
   "codeCounters": {
     "C": 72,
-    "N": 27
+    "N": 27,
+    "E": 1
   },
   "synopsis": [
     {
