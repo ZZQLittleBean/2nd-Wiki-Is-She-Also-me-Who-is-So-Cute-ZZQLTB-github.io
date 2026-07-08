@@ -1909,6 +1909,46 @@
             return imgRef;
         },
 
+        // 【隔离】剧情梗概图片专用 URL 解析函数（完全独立于 resolveImageUrl）
+        // 回退至最初GitHub版本处理：优先从localStorage缓存恢复data URL
+        resolveSynopsisImageUrl1(imgRef) {
+            if (!imgRef) return '';
+            // data URL 直接返回
+            if (imgRef.startsWith('data:')) return imgRef;
+            // blob URL 跨页面无效，返回空
+            if (imgRef.startsWith('blob:')) return '';
+            // http URL 直接返回
+            if (imgRef.startsWith('http')) return imgRef;
+            // {{IMG:filename}} 格式 → 优先从localStorage缓存恢复为data URL
+            if (imgRef.startsWith('{{IMG:')) {
+                const match = imgRef.match(/\{\{IMG:(.+?)\}\}/);
+                if (match && match[1]) {
+                    const filename = match[1];
+                    // 尝试从localStorage缓存获取data URL
+                    try {
+                        const chunkCount = localStorage.getItem('novelWiki_img_count');
+                        if (chunkCount) {
+                            for (let i = 0; i < parseInt(chunkCount); i++) {
+                                const chunkStr = localStorage.getItem(`novelWiki_img_${i}`);
+                                if (chunkStr) {
+                                    const chunk = JSON.parse(chunkStr);
+                                    if (chunk[filename]) return chunk[filename];
+                                }
+                            }
+                        }
+                        const oldCache = localStorage.getItem('novelWiki_imageCache_v1');
+                        if (oldCache) {
+                            const cache = JSON.parse(oldCache);
+                            if (cache[filename]) return cache[filename];
+                        }
+                    } catch (e) {}
+                    // 缓存未命中：返回相对路径（需data/wiki-images/目录中有文件）
+                    return `./data/wiki-images/${filename}`;
+                }
+            }
+            return imgRef;
+        },
+
         // ==================== 辅助函数 ====================
         findEntry(idOrCode) {
             if (!idOrCode) return null;
@@ -2703,22 +2743,27 @@
 
                 let imgHtml = '';
                 if (chapter.image) {
-                    const imgUrl = this.resolveImageUrl(chapter.image);
+                    const imgUrl = this.resolveSynopsisImageUrl1(chapter.image);
                     imgHtml = `<img src="${imgUrl}" class="synopsis-view-image" onerror="this.style.display='none'" alt="">`;
                 }
 
                 // 解析内容中的索引
                 let contentHtml = this.parseContentText(chapter.content || '');
 
-                // 【新增】检查是否存在正文词条（使用 chapterId 关联）
+                // 【新增】检查是否存在正文词条（使用 chapterId 关联）- 始终显示按钮
                 const chId = chapter.chapterId || chapter.id;
-                const hasBodyEntry = this.data.entries.some(e => e.type === 'body' && e.versions[0]?.chapterFrom === chId);
-                const viewBodyBtn = hasBodyEntry ? `
+                const bodyEntry = this.data.entries.find(e => e.type === 'body' && e.versions[0]?.chapterFrom === chId);
+                const viewBodyBtn = bodyEntry ? `
                     <button onclick="event.stopPropagation(); app.openBodyEntry('${chId}')" 
                         class="ml-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full text-xs font-medium transition flex items-center gap-1">
                         <i class="fa-solid fa-book-open"></i> 查看正文
                     </button>
-                ` : '';
+                ` : `
+                    <button onclick="event.stopPropagation(); app.openBodyEntry('${chId}')" 
+                        class="ml-2 px-3 py-1 bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 rounded-full text-xs font-medium transition flex items-center gap-1">
+                        <i class="fa-solid fa-pen-to-square"></i> 编辑正文
+                    </button>
+                `;
 
                 item.innerHTML = `
                     <div class="synopsis-view-header flex justify-between items-center">
@@ -2804,7 +2849,7 @@
             if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
             numEl.textContent = this.formatChapterNum(chapter.num);
             titleEl.textContent = chapter.title || '';
-            if (imgEl && chapter.image) { imgEl.src = this.resolveImageUrl(chapter.image); imgEl.classList.remove('hidden'); }
+            if (imgEl && chapter.image) { imgEl.src = this.resolveSynopsisImageUrl1(chapter.image); imgEl.classList.remove('hidden'); }
             contentEl.innerHTML = this.parseContentText(chapter.content || '<span class="text-gray-400 italic">暂无内容</span>');
             const rect = triggerElement.getBoundingClientRect();
             const tooltipWidth = 450, tooltipHeight = 300;
