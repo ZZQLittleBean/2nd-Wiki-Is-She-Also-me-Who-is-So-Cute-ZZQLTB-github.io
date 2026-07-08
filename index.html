@@ -1271,10 +1271,10 @@
             // 【新增】渲染活动窗口
             this.renderHomeEventBanner(clone);
 
-            // 【新增】初始化首页分栏
-            this.initHomeColumnControl();
-
             container.appendChild(clone);
+
+            // 【关键修复】初始化首页分栏必须在 appendChild 之后，否则 getElementById 找不到元素
+            this.initHomeColumnControl();
         },
 
         renderHistory(parent) {
@@ -3027,11 +3027,8 @@
                 item.className = 'synopsis-view-item';
                 item.id = `synopsis-item-${idx}`;
 
-                let imgHtml = '';
-                if (chapter.image) {
-                    const imgUrl = this.resolveImageUrl(chapter.image);
-                    imgHtml = `<img src="${imgUrl}" class="synopsis-view-image" onerror="this.style.display='none'" alt="">`;
-                }
+                // 【重构】使用统一的剧情梗概图片渲染函数，加载失败显示占位图标
+                const imgHtml = chapter.image ? this.renderSynopsisImage(chapter.image, '', chapter.title || '') : '';
 
                 // 解析内容中的索引
                 let contentHtml = this.parseContentText(chapter.content || '');
@@ -3135,7 +3132,16 @@
             if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
             numEl.textContent = this.formatChapterNum(chapter.num);
             titleEl.textContent = chapter.title || '';
-            if (imgEl && chapter.image) { imgEl.src = this.resolveImageUrl(chapter.image); imgEl.classList.remove('hidden'); }
+            // 【重构】tooltip 图片加载：设置 src + onerror 处理
+            if (imgEl) {
+                if (chapter.image) {
+                    imgEl.src = this.resolveImageUrl(chapter.image);
+                    imgEl.classList.remove('hidden');
+                    imgEl.onerror = function() {
+                        this.outerHTML = '<div style="width:100%;height:100px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#d1d5db;margin-bottom:12px;"><i class="fa-solid fa-image" style="font-size:1.5rem;"></i></div>';
+                    };
+                } else { imgEl.classList.add('hidden'); }
+            }
             contentEl.innerHTML = this.parseContentText(chapter.content || '<span class="text-gray-400 italic">暂无内容</span>');
             const rect = triggerElement.getBoundingClientRect();
             const tooltipWidth = 450, tooltipHeight = 300;
@@ -3207,17 +3213,36 @@
                 .replace(/\[\[([^\]]+)\]\]/g, '$1')
                 .replace(/@([^\[]+)\[[^\]]+\]/g, '@$1');
         },
+        // 【重构】剧情梗概图片专用 URL 解析 — 统一使用 ./data/wiki-images/ 路径
         _resolveImageUrl(imgRef) {
             if (!imgRef) return '';
             if (imgRef.startsWith('data:') || imgRef.startsWith('http')) return imgRef;
-            // blob URL 在 GitHub 跨域无效
             if (imgRef.startsWith('blob:')) return '';
-            if (imgRef.startsWith('{{IMG:')) { const m = imgRef.match(/\{\{IMG:(.+?)\}\}/); if (m && m[1]) return './wiki-images/' + m[1]; }
+            if (imgRef.startsWith('{{IMG:')) {
+                const m = imgRef.match(/\{\{IMG:(.+?)\}\}/);
+                // 【关键修复】统一为 ./data/wiki-images/（与 resolveImageUrl 保持一致）
+                if (m && m[1]) return './data/wiki-images/' + m[1];
+            }
             return imgRef;
         },
+        // 【重构】剧情梗概图片统一渲染函数 — 加载失败时显示占位图标而非隐藏
+        renderSynopsisImage(imgRef, className = '', altText = '') {
+            const url = this.resolveImageUrl(imgRef || '');
+            if (!url) {
+                return `<div class="synopsis-img-placeholder ${className}" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>`;
+            }
+            const cls = className ? ' ' + className : '';
+            const alt = altText ? this.escapeHtml(altText) : '';
+            // 使用 data-src 存储原始引用，onerror 触发占位符替换
+            return `<img src="${url}" data-img-ref="${this.escapeHtml(imgRef || '')}" class="synopsis-view-image${cls}" alt="${alt}" onerror="this.outerHTML='<div class=\\'synopsis-img-placeholder synopsis-view-image${cls}\\' style=\\'width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;\\'><i class=\\'fa-solid fa-image\\' style=\\'font-size:2rem;\\'></i></div>'">`;
+        },
+        // 【重构】内联图片渲染 — 统一路径并添加失败处理
         _renderInlineImages(text) {
             if (!text) return '';
-            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => '<img src="./wiki-images/' + filename + '" style="max-width:100%;border-radius:8px;margin:8px 0;" onerror="this.style.display=\'none\'"/>');
+            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => {
+                const url = './data/wiki-images/' + filename;
+                return '<img src="' + url + '" style="max-width:100%;border-radius:8px;margin:8px 0;" onerror="this.outerHTML=\'<div style=\\'width:100%;height:120px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#d1d5db;\\'><i class=\\'fa-solid fa-image\\' style=\\'font-size:1.5rem;\\'></i></div>\'"/>';
+            });
         },
         _getCurrentEntryExportData() {
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
