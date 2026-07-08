@@ -1839,7 +1839,7 @@
             if (imgRef.startsWith('{{IMG:')) {
                 const match = imgRef.match(/\{\{IMG:(.+?)\}\}/);
                 if (match && match[1]) {
-                    return `./data/wiki-images/${match[1]}`;
+                    return `./images/${match[1]}`;
                 }
             }
             return imgRef;
@@ -2824,12 +2824,12 @@
             if (imgRef.startsWith('data:') || imgRef.startsWith('http')) return imgRef;
             // blob URL 在 GitHub 跨域无效
             if (imgRef.startsWith('blob:')) return '';
-            if (imgRef.startsWith('{{IMG:')) { const m = imgRef.match(/\{\{IMG:(.+?)\}\}/); if (m && m[1]) return './data/wiki-images/' + m[1]; }
+            if (imgRef.startsWith('{{IMG:')) { const m = imgRef.match(/\{\{IMG:(.+?)\}\}/); if (m && m[1]) return './images/' + m[1]; }
             return imgRef;
         },
         _renderInlineImages(text) {
             if (!text) return '';
-            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => '<img src="./data/wiki-images/' + filename + '" style="max-width:100%;border-radius:8px;margin:8px 0;" onerror="this.style.display=\'none\'"/>');
+            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => '<img src="./images/' + filename + '" style="max-width:100%;border-radius:8px;margin:8px 0;" onerror="this.style.display=\'none\'"/>');
         },
         _getCurrentEntryExportData() {
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
