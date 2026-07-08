@@ -683,24 +683,31 @@
 
         // 【新增】统一的加载完成处理（避免重复代码）
         _finishLoading() {
-            if (this.data.chapters && this.data.chapters.length > 0) {
-                this.syncBodyEntriesWithChapters();
+            try {
+                if (this.data.chapters && this.data.chapters.length > 0) {
+                    this.syncBodyEntriesWithChapters();
+                }
+            } catch (e) { console.warn('[Finish] syncBodyEntries 失败:', e); }
+            try {
+                if (this.data.settings?.customFont) {
+                    document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
+                }
+            } catch (e) { /* ignore */ }
+            try { this._restoreImagesFromLocalCache(); } catch (e) { console.warn('[Finish] 图片恢复失败:', e); }
+            try { this.hideLoadingState(); } catch (e) { /* ignore */ }
+            try { this.setupUI(); } catch (e) { console.warn('[Finish] setupUI 失败:', e); }
+            // 【修复】确保 router('home') 被调用，即使前面步骤出错
+            try { this.router('home'); } catch (e) {
+                console.error('[Finish] router home 失败:', e);
+                setTimeout(() => { try { this.router('home'); } catch (e2) {} }, 200);
             }
-            if (this.data.settings?.customFont) {
-                document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
-            }
-            // 【修复】从localStorage缓存恢复图片data URL（同一浏览器访问过本地版时可用）
-            this._restoreImagesFromLocalCache();
-            this.hideLoadingState();
-            this.setupUI();
-            this.router('home');
-            this.initKeyboardListeners();
+            try { this.initKeyboardListeners(); } catch (e) { /* ignore */ }
         },
 
-        // 【修复】从localStorage图片缓存恢复data URL，并处理各种图片格式
+        // 【修复】从localStorage图片缓存恢复data URL，并清理无效格式
         _restoreImagesFromLocalCache() {
             try {
-                // 1. 读取 localStorage 图片缓存
+                // 1. 读取 localStorage 图片缓存（新格式分片 + 旧格式）
                 const imageCache = {};
                 const chunkCount = localStorage.getItem('novelWiki_img_count');
                 if (chunkCount) {
@@ -713,18 +720,23 @@
                 if (oldCache) Object.assign(imageCache, JSON.parse(oldCache));
                 const hasCache = Object.keys(imageCache).length > 0;
 
-                // 2. 处理剧情梗概图片：{{IMG:}} → 从缓存恢复为data URL；blob: → 清空
+                // 2. 处理剧情梗概图片
                 let restored = 0, needFiles = 0;
                 if (this.data.synopsis) {
                     this.data.synopsis.forEach(ch => {
                         const img = ch.image || '';
                         if (img.startsWith('{{IMG:')) {
+                            // 尝试从 localStorage 缓存恢复为 data URL
                             const m = img.match(/\{\{IMG:(.+?)\}\}/);
                             if (m && hasCache && imageCache[m[1]]) {
                                 ch.image = imageCache[m[1]]; restored++;
                             } else if (m) { needFiles++; }
-                        } else if (img.startsWith('blob:')) ch.image = '';
-                        // data: / http: 保持不变
+                            // 无缓存：保持 {{IMG:}}，resolveImageUrl 会转换为 ./data/wiki-images/ 路径
+                        } else if (img.startsWith('blob:')) {
+                            // blob URL 跨页面无效，清空
+                            ch.image = '';
+                        }
+                        // data: / http: 保持不变（可直接显示）
                     });
                 }
 
@@ -1095,6 +1107,12 @@
         router(view, skipHistory = false) {
             this.data.currentView = view;
             const container = document.getElementById('main-container');
+            // 【修复】防御性检查：确保 container 存在
+            if (!container) {
+                console.error('[Router] main-container 不存在，延迟重试');
+                setTimeout(() => this.router(view, skipHistory), 100);
+                return;
+            }
             container.innerHTML = '';
 
             // 【功能4】离开详情页时清除隐藏词条黑底白字状态
