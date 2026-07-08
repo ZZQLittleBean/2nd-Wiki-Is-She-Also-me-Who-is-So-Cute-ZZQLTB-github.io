@@ -3060,6 +3060,23 @@
                     <div class="synopsis-view-content line-clamp" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;">${contentHtml}</div>`;
                 container.appendChild(item);
             });
+            // 【重构】统一绑定图片加载失败事件，避免内联 onerror 的引号问题
+            this._bindSynopsisImageErrors(container);
+        },
+        // 【重构】为剧情梗概图片绑定 error 事件 — 替代内联 onerror
+        _bindSynopsisImageErrors(container) {
+            if (!container) return;
+            container.querySelectorAll('.synopsis-view-image[data-fallback]').forEach(function(img) {
+                img.onerror = function() {
+                    const fallback = this.getAttribute('data-fallback');
+                    if (fallback) {
+                        const div = document.createElement('div');
+                        div.innerHTML = fallback;
+                        const placeholder = div.firstElementChild;
+                        if (placeholder) this.parentNode.replaceChild(placeholder, this);
+                    }
+                };
+            });
         },
 
         setSynopsisActiveIndex(idx) {
@@ -3226,22 +3243,22 @@
             return imgRef;
         },
         // 【重构】剧情梗概图片统一渲染函数 — 加载失败时显示占位图标而非隐藏
-        renderSynopsisImage(imgRef, className = '', altText = '') {
+        renderSynopsisImage(imgRef, className, altText) {
             const url = this.resolveImageUrl(imgRef || '');
             if (!url) {
-                return `<div class="synopsis-img-placeholder ${className}" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>`;
+                return '<div class="synopsis-img-placeholder ' + (className || '') + '" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>';
             }
             const cls = className ? ' ' + className : '';
             const alt = altText ? this.escapeHtml(altText) : '';
-            // 使用 data-src 存储原始引用，onerror 触发占位符替换
-            return `<img src="${url}" data-img-ref="${this.escapeHtml(imgRef || '')}" class="synopsis-view-image${cls}" alt="${alt}" onerror="this.outerHTML='<div class=\\'synopsis-img-placeholder synopsis-view-image${cls}\\' style=\\'width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;\\'><i class=\\'fa-solid fa-image\\' style=\\'font-size:2rem;\\'></i></div>'">`;
+            // 【关键修复】用 data 属性存储 fallback HTML，避免内联 onerror 的引号地狱
+            const fallback = '<div class="synopsis-img-placeholder synopsis-view-image' + cls + '" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>';
+            return '<img src="' + url + '" data-img-ref="' + this.escapeHtml(imgRef || '') + '" data-fallback="' + this.escapeHtml(fallback) + '" class="synopsis-view-image' + cls + '" alt="' + alt + '">';
         },
-        // 【重构】内联图片渲染 — 统一路径并添加失败处理
+        // 【重构】内联图片渲染 — 统一路径
         _renderInlineImages(text) {
             if (!text) return '';
-            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => {
-                const url = './data/wiki-images/' + filename;
-                return '<img src="' + url + '" style="max-width:100%;border-radius:8px;margin:8px 0;" onerror="this.outerHTML=\'<div style=\\'width:100%;height:120px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#d1d5db;\\'><i class=\\'fa-solid fa-image\\' style=\\'font-size:1.5rem;\\'></i></div>\'"/>';
+            return text.replace(/\{\{IMG:([^}]+)\}\}/g, function(match, filename) {
+                return '<img src="./data/wiki-images/' + filename + '" style="max-width:100%;border-radius:8px;margin:8px 0;" class="synopsis-inline-img" data-inline-src="' + filename + '"/>';
             });
         },
         _getCurrentEntryExportData() {
