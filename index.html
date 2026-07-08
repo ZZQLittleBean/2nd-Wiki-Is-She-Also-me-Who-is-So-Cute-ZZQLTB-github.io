@@ -702,8 +702,7 @@
 
         // 【修复】从localStorage图片缓存恢复data URL，并清理无效格式
         _restoreImagesFromLocalCache() {
-            // 【空函数】GitHub版不读取本地版localStorage缓存
-            // 剧情梗概图片通过 resolveSynopsisImageUrl1 处理
+            // GitHub版不读取本地版localStorage缓存
         },
 
         // 【新增】延迟非关键操作（about.json 加载、事件监听等）
@@ -1848,24 +1847,6 @@
 
         // 【隔离】剧情梗概图片专用 URL 解析函数（完全独立于 resolveImageUrl）
         // 回退至最初GitHub版本处理：优先从localStorage缓存恢复data URL
-        resolveSynopsisImageUrl1(imgRef) {
-            if (!imgRef) return '';
-            // dataUrl 直接返回
-            if (imgRef.startsWith('data:')) return imgRef;
-            // blob URL 直接返回
-            if (imgRef.startsWith('blob:')) return imgRef;
-            // http URL 直接返回
-            if (imgRef.startsWith('http')) return imgRef;
-            // {{IMG:filename}} 格式 → 转换为相对路径
-            if (imgRef.startsWith('{{IMG:')) {
-                const match = imgRef.match(/\{\{IMG:(.+?)\}\}/);
-                if (match && match[1]) {
-                    return `./data/wiki-images/${match[1]}`;
-                }
-            }
-            return imgRef;
-        },
-
         // ==================== 辅助函数 ====================
         findEntry(idOrCode) {
             if (!idOrCode) return null;
@@ -2660,7 +2641,7 @@
 
                 let imgHtml = '';
                 if (chapter.image) {
-                    const imgUrl = this.resolveSynopsisImageUrl1(chapter.image);
+                    const imgUrl = this.resolveImageUrl(chapter.image);
                     imgHtml = `<img src="${imgUrl}" class="synopsis-view-image" onerror="this.style.display='none'" alt="">`;
                 }
 
@@ -2766,7 +2747,7 @@
             if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
             numEl.textContent = this.formatChapterNum(chapter.num);
             titleEl.textContent = chapter.title || '';
-            if (imgEl && chapter.image) { imgEl.src = this.resolveSynopsisImageUrl1(chapter.image); imgEl.classList.remove('hidden'); }
+            if (imgEl && chapter.image) { imgEl.src = this.resolveImageUrl(chapter.image); imgEl.classList.remove('hidden'); }
             contentEl.innerHTML = this.parseContentText(chapter.content || '<span class="text-gray-400 italic">暂无内容</span>');
             const rect = triggerElement.getBoundingClientRect();
             const tooltipWidth = 450, tooltipHeight = 300;
