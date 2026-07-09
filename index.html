@@ -1804,7 +1804,7 @@
             const div = document.createElement('div');
             let img = version.images?.card || version.images?.avatar || '';
             img = this.resolveImageUrl(img);
-            const hasImage = img && (img.startsWith('data:') || img.startsWith('http') );
+            const hasImage = img && (img.startsWith('data:') || img.startsWith('http') || img.includes('/wiki-images/'));
 
             div.dataset.hasImage = hasImage ? 'true' : 'false';
             div.className = 'bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:shadow-md transition hover:border-indigo-300 flex flex-col relative group';
@@ -1959,7 +1959,7 @@
             if (isBodyEntry && cardImg && cardImg.startsWith('{{IMG:')) {
                 cardImg = this.resolveImageUrl(cardImg);
             }
-            const hasImage = cardImg && (cardImg.startsWith('data:') || cardImg.startsWith('http'));
+            const hasImage = cardImg && (cardImg.startsWith('data:') || cardImg.startsWith('http') || cardImg.includes('/wiki-images/'));
 
             // 【修复】正文词条：剧情梗概文本安全处理
             let synopsisHtmlGh = '';
@@ -2243,7 +2243,10 @@
             html = html.replace(/__(.+?)__/g, '<u>$1</u>');
             html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
-            // 7. 换行符转为 <br>（EscapeHTML已经转义了换行符，需要恢复）
+            // 7. 处理内联图片 {{IMG:filename}}
+            html = this._renderInlineImages(html);
+
+            // 8. 换行符转为 <br>（EscapeHTML已经转义了换行符，需要恢复）
             html = html.replace(/\n/g, '<br>');
 
             return html;
