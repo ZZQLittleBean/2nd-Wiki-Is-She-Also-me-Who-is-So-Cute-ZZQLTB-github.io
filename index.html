@@ -286,7 +286,7 @@
                 <div id="home-multi-col-container" class="home-multi-col-1">
                 <div id="active-event-banner" class="hidden home-col-item">
                     <div class="active-event-banner" onclick="app.openActiveEvent()">
-                        <img id="active-event-image" class="active-event-bg" src="" alt="">
+                        <img id="active-event-image" class="active-event-bg" src="" alt="" loading="eager" fetchpriority="high">
                         <div class="active-event-overlay"></div>
                         <div class="active-event-content">
                             <span class="active-event-label"><i class="fa-solid fa-star mr-1"></i>进行中</span>
@@ -1087,7 +1087,7 @@
                 </div>`;
         },
 
-        async loadManualData() {
+        loadManualData() {
             const textarea = document.getElementById('manual-data-input');
             const errorDiv = document.getElementById('manual-load-error');
             if (!textarea || !textarea.value.trim()) {
@@ -1101,11 +1101,25 @@
                     if (errorDiv) { errorDiv.textContent = '数据格式错误: ' + validation.error; errorDiv.classList.remove('hidden'); }
                     return;
                 }
+                // 【关键修复】先清空弹窗避免DOM残留干扰渲染，再延迟执行确保onclick事件栈完全退出
+                const container = document.getElementById('main-container');
+                if (container) container.innerHTML = '';
                 this.data = { ...this.data, ...data };
                 this._loaded = true;
                 this._deferCacheWrite(data);
-                this._finishLoading();
-                this.showToast('数据手动加载成功！下次刷新将从缓存秒开。', 'success', 5000);
+                // 延迟到下一个事件循环，确保onclick处理完成、DOM已更新
+                setTimeout(() => {
+                    try {
+                        this._finishLoading();
+                        this.showToast('数据手动加载成功！下次刷新将从缓存秒开。', 'success', 5000);
+                    } catch (e) {
+                        console.error('[loadManualData] _finishLoading 失败:', e);
+                        // 若首次渲染失败，200ms后再重试一次
+                        setTimeout(() => {
+                            try { this._finishLoading(); } catch (e2) {}
+                        }, 200);
+                    }
+                }, 0);
             } catch (e) {
                 if (errorDiv) { errorDiv.textContent = 'JSON 解析失败: ' + e.message; errorDiv.classList.remove('hidden'); }
             }
@@ -1524,6 +1538,22 @@
                     else if (block.type === 'h3') html += `<h3 class="text-lg font-semibold text-gray-700 mt-4 mb-2">${this.escapeHtml(block.text)}</h3>`;
                     else if (block.type === 'p') { let text = block.text || ''; text = this.parseContentText(text); html += `<p class="text-gray-600 leading-relaxed mb-4" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${text}</p>`; }
                     else if (block.type === 'img') { const imgRef = block.src || ''; let imgSrc = this.resolveImageUrl(imgRef); const caption = block.caption || ''; html += `<div class="event-block-image"><img src="${imgSrc}" data-img-ref="${this.escapeHtml(imgRef)}" alt="${this.escapeHtml(caption)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'text-gray-400 py-4\'><i class=\'fa-solid fa-image text-2xl\'></i><p class=\'text-xs mt-1\'>图片加载失败</p></div>'">${caption ? `<div class="event-block-image-caption">${this.escapeHtml(caption)}</div>` : ''}</div>`; }
+                    else if (block.type === 'table') {
+                        // 【新增】表格元件渲染
+                        const rows = block.rows || [];
+                        if (rows.length > 0) {
+                            html += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">';
+                            html += '<thead class="bg-gray-100"><tr>';
+                            (rows[0] || []).forEach(cell => { html += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold">' + this.escapeHtml(cell) + '</th>'; });
+                            html += '</tr></thead><tbody>';
+                            for (let r = 1; r < rows.length; r++) {
+                                html += '<tr>';
+                                (rows[r] || []).forEach(cell => { html += '<td class="border border-gray-200 p-2 text-sm text-gray-600">' + this.escapeHtml(cell) + '</td>'; });
+                                html += '</tr>';
+                            }
+                            html += '</tbody></table></div>';
+                        }
+                    }
                 });
             } else { html += '<div class="text-gray-400 italic text-center py-8">暂无内容</div>'; }
             html += '</div>';
@@ -1977,6 +2007,27 @@
                         // 【核心修复】使用统一的索引解析函数
                         text = this.parseContentText(text);
                         contentBlocksHtml += `<p class="text-gray-600 leading-relaxed mb-4" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${text}</p>`;
+                    } else if (block.type === 'img') {
+                        // 【新增】图片元件渲染
+                        const imgRef = block.src || '';
+                        const imgSrc = this.resolveImageUrl(imgRef);
+                        const caption = block.caption || '';
+                        contentBlocksHtml += `<div class="event-block-image"><img src="${imgSrc}" alt="${this.escapeHtml(caption)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'text-gray-400 py-4\'><i class=\'fa-solid fa-image text-2xl\'></i><p class=\'text-xs mt-1\'>图片加载失败</p></div>'">${caption ? `<div class="event-block-image-caption">${this.escapeHtml(caption)}</div>` : ''}</div>`;
+                    } else if (block.type === 'table') {
+                        // 【新增】表格元件渲染
+                        const rows = block.rows || [];
+                        if (rows.length > 0) {
+                            contentBlocksHtml += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">';
+                            contentBlocksHtml += '<thead class="bg-gray-100"><tr>';
+                            (rows[0] || []).forEach(cell => { contentBlocksHtml += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold">' + this.escapeHtml(cell) + '</th>'; });
+                            contentBlocksHtml += '</tr></thead><tbody>';
+                            for (let r = 1; r < rows.length; r++) {
+                                contentBlocksHtml += '<tr>';
+                                (rows[r] || []).forEach(cell => { contentBlocksHtml += '<td class="border border-gray-200 p-2 text-sm text-gray-600">' + this.escapeHtml(cell) + '</td>'; });
+                                contentBlocksHtml += '</tr>';
+                            }
+                            contentBlocksHtml += '</tbody></table></div>';
+                        }
                     }
                 });
             } else {
@@ -3024,8 +3075,14 @@
                 item.className = 'synopsis-view-item';
                 item.id = `synopsis-item-${idx}`;
 
-                // 【重构】使用统一的剧情梗概图片渲染函数，加载失败显示占位图标
-                const imgHtml = chapter.image ? this.renderSynopsisImage(chapter.image, '', chapter.title || '') : '';
+                // 【重写】剧情梗概图片：直接参照词条图片机制使用 resolveImageUrl + 内联 onerror
+                let imgHtml = '';
+                if (chapter.image) {
+                    const imgUrl = this.resolveImageUrl(chapter.image);
+                    if (imgUrl) {
+                        imgHtml = '<img src="' + imgUrl + '" class="synopsis-view-image" alt="' + this.escapeHtml(chapter.title || '') + '" onerror="this.style.display=\'none\'">';
+                    }
+                }
 
                 // 解析内容中的索引
                 let contentHtml = this.parseContentText(chapter.content || '');
@@ -3056,22 +3113,6 @@
                     ${imgHtml}
                     <div class="synopsis-view-content line-clamp" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;">${contentHtml}</div>`;
                 container.appendChild(item);
-            });
-            // 【重构】统一绑定图片加载失败事件，避免内联 onerror 的引号问题
-            this._bindSynopsisImageErrors(container);
-        },
-        // 【重构】为剧情梗概图片绑定 error 事件 — 替代内联 onerror
-        // 【关键修复】直接在 onerror 中创建占位符元素，不依赖 data-fallback 属性（避免 escapeHtml 破坏 HTML）
-        _bindSynopsisImageErrors(container) {
-            if (!container) return;
-            container.querySelectorAll('img[data-synopsis-img]').forEach(function(img) {
-                img.onerror = function() {
-                    var placeholder = document.createElement('div');
-                    placeholder.className = this.className.replace('synopsis-view-image', 'synopsis-img-placeholder');
-                    placeholder.style.cssText = 'width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;';
-                    placeholder.innerHTML = '<i class="fa-solid fa-image" style="font-size:2rem;"></i>';
-                    if (this.parentNode) this.parentNode.replaceChild(placeholder, this);
-                };
             });
         },
 
@@ -3145,15 +3186,17 @@
             if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
             numEl.textContent = this.formatChapterNum(chapter.num);
             titleEl.textContent = chapter.title || '';
-            // 【重构】tooltip 图片加载：使用 _resolveImageUrl（剧情梗概专用）+ onerror 处理
+            // 【重写】tooltip 图片：参照词条图片机制直接使用 resolveImageUrl
             if (imgEl) {
                 if (chapter.image) {
-                    // 【关键修复】使用 _resolveImageUrl 保持与词条图片解析的隔离
-                    imgEl.src = this._resolveImageUrl(chapter.image);
-                    imgEl.classList.remove('hidden');
-                    imgEl.onerror = function() {
-                        this.outerHTML = '<div style="width:100%;height:100px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#d1d5db;margin-bottom:12px;"><i class="fa-solid fa-image" style="font-size:1.5rem;"></i></div>';
-                    };
+                    const imgUrl = this.resolveImageUrl(chapter.image);
+                    if (imgUrl) {
+                        imgEl.src = imgUrl;
+                        imgEl.classList.remove('hidden');
+                        imgEl.onerror = function() {
+                            this.outerHTML = '<div style="width:100%;height:100px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#d1d5db;margin-bottom:12px;"><i class="fa-solid fa-image" style="font-size:1.5rem;"></i></div>';
+                        };
+                    } else { imgEl.classList.add('hidden'); }
                 } else { imgEl.classList.add('hidden'); }
             }
             contentEl.innerHTML = this.parseContentText(chapter.content || '<span class="text-gray-400 italic">暂无内容</span>');
@@ -3227,35 +3270,13 @@
                 .replace(/\[\[([^\]]+)\]\]/g, '$1')
                 .replace(/@([^\[]+)\[[^\]]+\]/g, '@$1');
         },
-        // 【重构】剧情梗概图片专用 URL 解析 — 统一使用 ./data/wiki-images/ 路径
-        _resolveImageUrl(imgRef) {
-            if (!imgRef) return '';
-            if (imgRef.startsWith('data:') || imgRef.startsWith('http')) return imgRef;
-            if (imgRef.startsWith('blob:')) return '';
-            if (imgRef.startsWith('{{IMG:')) {
-                const m = imgRef.match(/\{\{IMG:(.+?)\}\}/);
-                // 【关键修复】统一为 ./data/wiki-images/（与 resolveImageUrl 保持一致）
-                if (m && m[1]) return './data/wiki-images/' + m[1];
-            }
-            return imgRef;
-        },
-        // 【重构】剧情梗概图片统一渲染函数 — 使用 _resolveImageUrl 保持与词条图片隔离
-        renderSynopsisImage(imgRef, className, altText) {
-            // 【关键修复】使用 _resolveImageUrl（剧情梗概专用），与 resolveImageUrl（词条通用）隔离
-            const url = this._resolveImageUrl(imgRef || '');
-            if (!url) {
-                return '<div class="synopsis-img-placeholder ' + (className || '') + '" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>';
-            }
-            const cls = className ? ' ' + className : '';
-            const alt = altText ? this.escapeHtml(altText) : '';
-            // 【关键修复】用 data-synopsis-img 标记，onerror 由 _bindSynopsisImageErrors 统一绑定
-            return '<img src="' + url + '" data-synopsis-img="1" data-img-ref="' + this.escapeHtml(imgRef || '') + '" class="synopsis-view-image' + cls + '" alt="' + alt + '">';
-        },
-        // 【重构】内联图片渲染 — 统一路径
+
+        // 【重构】内联图片渲染 — 复用 resolveImageUrl 统一解析
         _renderInlineImages(text) {
             if (!text) return '';
-            return text.replace(/\{\{IMG:([^}]+)\}\}/g, function(match, filename) {
-                return '<img src="./data/wiki-images/' + filename + '" style="max-width:100%;border-radius:8px;margin:8px 0;" class="synopsis-inline-img" data-inline-src="' + filename + '"/>';
+            return text.replace(/\{\{IMG:([^}]+)\}\}/g, (match, filename) => {
+                const url = this.resolveImageUrl('{{IMG:' + filename + '}}');
+                return '<img src="' + url + '" style="max-width:100%;border-radius:8px;margin:8px 0;" class="synopsis-inline-img" onerror="this.style.display=\'none\'"/>';
             });
         },
         _getCurrentEntryExportData() {
@@ -3324,14 +3345,14 @@
                     if (block.type === 'h2') { contentText += plain + '\n\n'; contentMarkdown += '## ' + plain + '\n\n'; contentHtml += '<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:28px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">' + safe + '</h2>'; }
                     else if (block.type === 'h3') { contentText += plain + '\n\n'; contentMarkdown += '### ' + plain + '\n\n'; contentHtml += '<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:18px 0 8px;">' + safe + '</h3>'; }
                     else if (block.type === 'p') { contentText += plain + '\n\n'; contentMarkdown += plain + '\n\n'; let rendered = this.parseInlineMarkdown ? this.parseInlineMarkdown(plain) : safe; contentHtml += '<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:10px 0;text-align:justify;">' + rendered + '</p>'; }
-                    else if (block.type === 'image') { const imgUrl = this._resolveImageUrl(block.src || ''); if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>'; }
+                    else if (block.type === 'image') { const imgUrl = this.resolveImageUrl(block.src || ''); if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>'; }
                 });
             }
             const mark = this.data.settings?.exportMark;
             let markText = '', markMarkdown = '', markHtml = '';
             if (mark && mark.enabled) {
                 if (mark.text) { markText = '\n---\n' + mark.text; markMarkdown = '\n\n---\n\n' + mark.text; markHtml += '<div style="margin-top:24px;padding-top:16px;border-top:2px solid #e5e7eb;color:#6b7280;font-size:13px;">' + this.escapeHtml(mark.text).replace(/\n/g, '<br>') + '</div>'; }
-                if (mark.image) { const miu = this._resolveImageUrl(mark.image); markHtml += '<div style="margin-top:12px;text-align:center;"><img src="' + miu + '" style="max-width:200px;max-height:80px;border-radius:4px;" onerror="this.style.display=\'none\'"/></div>'; }
+                if (mark.image) { const miu = this.resolveImageUrl(mark.image); markHtml += '<div style="margin-top:12px;text-align:center;"><img src="' + miu + '" style="max-width:200px;max-height:80px;border-radius:4px;" onerror="this.style.display=\'none\'"/></div>'; }
             }
             return { entry, version, typeLabel, chapterRange, allVersions, relations, synopsis, synopsisHtml, contentText, contentMarkdown, contentHtml, coverImage, markText, markMarkdown, markHtml, mark };
         },
