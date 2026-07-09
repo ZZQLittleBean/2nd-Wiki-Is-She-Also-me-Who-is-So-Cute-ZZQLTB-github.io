@@ -1988,9 +1988,18 @@
                 // 【新增】活动页词条独立渲染：头图在上 → 大标题+活动时间在下 → 内容块
                 if (entry.type === 'event') {
                     let eventHtml = '';
-                    // 头图占位符，渲染后异步填充
+                    // 【关键修复】同步解析 headerImage 并直接在 HTML 中设置 src，移除 requestAnimationFrame 异步加载
                     const headerImgRef = entry.headerImage || '';
-                    eventHtml += `<div id="event-detail-header" class="w-full rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 mb-4"><img id="event-detail-header-img" src="" class="w-full object-cover" style="aspect-ratio:21/9;" alt="${this.escapeHtml(version.title)}" onerror="this.style.display='none'; this.parentElement.classList.add('hidden');"></div>`;
+                    let headerSrc = '';
+                    if (headerImgRef.startsWith('data:') || headerImgRef.startsWith('http')) {
+                        headerSrc = headerImgRef;
+                    } else if (headerImgRef.startsWith('{{IMG:')) {
+                        const m = headerImgRef.match(/\{\{IMG:(.+?)\}\}/);
+                        if (m) headerSrc = './data/wiki-images/' + m[1];
+                    }
+                    // 无图片时直接隐藏容器，避免 src="" 触发 onerror
+                    const headerDisplay = headerSrc ? '' : 'display:none;';
+                    eventHtml += '<div id="event-detail-header" class="w-full rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 mb-4" style="' + headerDisplay + '"><img id="event-detail-header-img" src="' + headerSrc + '" class="w-full object-cover" style="aspect-ratio:21/9;" alt="' + this.escapeHtml(version.title) + '" onerror="this.style.display=\'none\'; this.parentElement.classList.add(\'hidden\');"></div>';
                     let dateText = '';
                     const dur = entry.duration;
                     if (!dur || dur.type === 'permanent') dateText = '常态上线';
@@ -2002,18 +2011,6 @@
                     eventHtml += `<div class="mb-4"><h1 class="text-3xl font-bold text-gray-900 leading-tight mb-2">${this.escapeHtml(version.title)}</h1><div class="flex items-center gap-2 text-xs text-gray-500"><span class="font-mono bg-gray-100 px-2 py-0.5 rounded">${entry.code}</span><span><i class="fa-regular fa-calendar mr-1"></i>${dateText}</span></div></div>`;
                     eventHtml += this.renderEventDetail(version);
                     contentEl.innerHTML = eventHtml;
-                    // 异步填充头图（支持 dataUrl 和 {{IMG:}} 路径）
-                    requestAnimationFrame(() => {
-                        const el = document.getElementById('event-detail-header-img');
-                        const box = document.getElementById('event-detail-header');
-                        if (!el) return;
-                        if (headerImgRef.startsWith('data:') || headerImgRef.startsWith('http')) {
-                            el.src = headerImgRef;
-                        } else if (headerImgRef.startsWith('{{IMG:')) {
-                            const m = headerImgRef.match(/\{\{IMG:(.+?)\}\}/);
-                            if (m) el.src = './data/wiki-images/' + m[1];
-                        } else { if (box) box.classList.add('hidden'); }
-                    });
                 } else if (isBodyEntry) {
                     // 【修复】正文词条：图片独立居中；其他词条：标题+图片并排
                     contentEl.innerHTML = `${headerHtml}${imageHtml}${contentBlocksHtml}`;
@@ -3064,17 +3061,16 @@
             this._bindSynopsisImageErrors(container);
         },
         // 【重构】为剧情梗概图片绑定 error 事件 — 替代内联 onerror
+        // 【关键修复】直接在 onerror 中创建占位符元素，不依赖 data-fallback 属性（避免 escapeHtml 破坏 HTML）
         _bindSynopsisImageErrors(container) {
             if (!container) return;
-            container.querySelectorAll('.synopsis-view-image[data-fallback]').forEach(function(img) {
+            container.querySelectorAll('img[data-synopsis-img]').forEach(function(img) {
                 img.onerror = function() {
-                    const fallback = this.getAttribute('data-fallback');
-                    if (fallback) {
-                        const div = document.createElement('div');
-                        div.innerHTML = fallback;
-                        const placeholder = div.firstElementChild;
-                        if (placeholder) this.parentNode.replaceChild(placeholder, this);
-                    }
+                    var placeholder = document.createElement('div');
+                    placeholder.className = this.className.replace('synopsis-view-image', 'synopsis-img-placeholder');
+                    placeholder.style.cssText = 'width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;';
+                    placeholder.innerHTML = '<i class="fa-solid fa-image" style="font-size:2rem;"></i>';
+                    if (this.parentNode) this.parentNode.replaceChild(placeholder, this);
                 };
             });
         },
@@ -3149,10 +3145,11 @@
             if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
             numEl.textContent = this.formatChapterNum(chapter.num);
             titleEl.textContent = chapter.title || '';
-            // 【重构】tooltip 图片加载：设置 src + onerror 处理
+            // 【重构】tooltip 图片加载：使用 _resolveImageUrl（剧情梗概专用）+ onerror 处理
             if (imgEl) {
                 if (chapter.image) {
-                    imgEl.src = this.resolveImageUrl(chapter.image);
+                    // 【关键修复】使用 _resolveImageUrl 保持与词条图片解析的隔离
+                    imgEl.src = this._resolveImageUrl(chapter.image);
                     imgEl.classList.remove('hidden');
                     imgEl.onerror = function() {
                         this.outerHTML = '<div style="width:100%;height:100px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#d1d5db;margin-bottom:12px;"><i class="fa-solid fa-image" style="font-size:1.5rem;"></i></div>';
@@ -3242,17 +3239,17 @@
             }
             return imgRef;
         },
-        // 【重构】剧情梗概图片统一渲染函数 — 加载失败时显示占位图标而非隐藏
+        // 【重构】剧情梗概图片统一渲染函数 — 使用 _resolveImageUrl 保持与词条图片隔离
         renderSynopsisImage(imgRef, className, altText) {
-            const url = this.resolveImageUrl(imgRef || '');
+            // 【关键修复】使用 _resolveImageUrl（剧情梗概专用），与 resolveImageUrl（词条通用）隔离
+            const url = this._resolveImageUrl(imgRef || '');
             if (!url) {
                 return '<div class="synopsis-img-placeholder ' + (className || '') + '" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>';
             }
             const cls = className ? ' ' + className : '';
             const alt = altText ? this.escapeHtml(altText) : '';
-            // 【关键修复】用 data 属性存储 fallback HTML，避免内联 onerror 的引号地狱
-            const fallback = '<div class="synopsis-img-placeholder synopsis-view-image' + cls + '" style="width:100%;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#d1d5db;"><i class="fa-solid fa-image" style="font-size:2rem;"></i></div>';
-            return '<img src="' + url + '" data-img-ref="' + this.escapeHtml(imgRef || '') + '" data-fallback="' + this.escapeHtml(fallback) + '" class="synopsis-view-image' + cls + '" alt="' + alt + '">';
+            // 【关键修复】用 data-synopsis-img 标记，onerror 由 _bindSynopsisImageErrors 统一绑定
+            return '<img src="' + url + '" data-synopsis-img="1" data-img-ref="' + this.escapeHtml(imgRef || '') + '" class="synopsis-view-image' + cls + '" alt="' + alt + '">';
         },
         // 【重构】内联图片渲染 — 统一路径
         _renderInlineImages(text) {
