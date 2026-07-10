@@ -1547,22 +1547,32 @@
                     else if (block.type === 'p') { let text = block.text || ''; text = this.parseContentText(text); html += `<p class="text-gray-600 leading-relaxed mb-4" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${text}</p>`; }
                     else if (block.type === 'img') { const imgRef = block.src || ''; let imgSrc = this.resolveImageUrl(imgRef); const caption = block.caption || ''; html += `<div class="event-block-image"><img src="${imgSrc}" data-img-ref="${this.escapeHtml(imgRef)}" alt="${this.escapeHtml(caption)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'text-gray-400 py-4\'><i class=\'fa-solid fa-image text-2xl\'></i><p class=\'text-xs mt-1\'>图片加载失败</p></div>'">${caption ? `<div class="event-block-image-caption">${this.escapeHtml(caption)}</div>` : ''}</div>`; }
                     else if (block.type === 'table') {
-                        // 【新增】表格元件渲染（支持colspan合并）
+                        // 【新增】表格元件渲染（支持colspan+对齐+样式）
                         const rows = block.rows || [];
                         const colspans = block.colspans || [];
+                        const aligns = block.aligns || [];
+                        const styles = block.styles || [];
+                        const _cellViewStyle = (r, c) => {
+                            const parts = [];
+                            const a = aligns[r] && aligns[r][c] ? aligns[r][c] : '';
+                            if (a) parts.push('text-align:' + a);
+                            const s = styles[r] && styles[r][c] ? styles[r][c] : null;
+                            if (s) { if (s.color) parts.push('color:' + s.color); if (s.bg) parts.push('background-color:' + s.bg); }
+                            return parts.length > 0 ? ' style="' + parts.join(';') + '"' : '';
+                        };
                         if (rows.length > 0) {
-                            html += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">';
+                            html += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm" style="table-layout:fixed;">';
                             html += '<thead class="bg-gray-100"><tr>';
                             (rows[0] || []).forEach((cell, cIdx) => {
                                 const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
-                                html += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold"' + cs + '>' + this.escapeHtml(cell) + '</th>';
+                                html += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold"' + cs + _cellViewStyle(0, cIdx) + '>' + this.parseInlineMarkdown(this.escapeHtml(cell)) + '</th>';
                             });
                             html += '</tr></thead><tbody>';
                             for (let r = 1; r < rows.length; r++) {
                                 html += '<tr>';
                                 (rows[r] || []).forEach((cell, cIdx) => {
                                     const cs = colspans[r] && colspans[r][cIdx] > 1 ? ' colspan="' + colspans[r][cIdx] + '"' : '';
-                                    html += '<td class="border border-gray-200 p-2 text-sm text-gray-600"' + cs + '>' + this.escapeHtml(cell) + '</td>';
+                                    html += '<td class="border border-gray-200 p-2 text-sm text-gray-600"' + cs + _cellViewStyle(r, cIdx) + '>' + this.parseInlineMarkdown(this.escapeHtml(cell)) + '</td>';
                                 });
                                 html += '</tr>';
                             }
@@ -2029,22 +2039,32 @@
                         const caption = block.caption || '';
                         contentBlocksHtml += `<div class="event-block-image"><img src="${imgSrc}" alt="${this.escapeHtml(caption)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'text-gray-400 py-4\'><i class=\'fa-solid fa-image text-2xl\'></i><p class=\'text-xs mt-1\'>图片加载失败</p></div>'">${caption ? `<div class="event-block-image-caption">${this.escapeHtml(caption)}</div>` : ''}</div>`;
                     } else if (block.type === 'table') {
-                        // 【新增】表格元件渲染（支持colspan合并）
+                        // 【新增】表格元件渲染（支持colspan+对齐+样式）
                         const rows = block.rows || [];
                         const colspans = block.colspans || [];
+                        const aligns = block.aligns || [];
+                        const styles = block.styles || [];
+                        const _cellViewStyle = (r, c) => {
+                            const parts = [];
+                            const a = aligns[r] && aligns[r][c] ? aligns[r][c] : '';
+                            if (a) parts.push('text-align:' + a);
+                            const s = styles[r] && styles[r][c] ? styles[r][c] : null;
+                            if (s) { if (s.color) parts.push('color:' + s.color); if (s.bg) parts.push('background-color:' + s.bg); }
+                            return parts.length > 0 ? ' style="' + parts.join(';') + '"' : '';
+                        };
                         if (rows.length > 0) {
-                            contentBlocksHtml += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">';
+                            contentBlocksHtml += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm" style="table-layout:fixed;">';
                             contentBlocksHtml += '<thead class="bg-gray-100"><tr>';
                             (rows[0] || []).forEach((cell, cIdx) => {
                                 const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
-                                contentBlocksHtml += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold"' + cs + '>' + this.escapeHtml(cell) + '</th>';
+                                contentBlocksHtml += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold"' + cs + _cellViewStyle(0, cIdx) + '>' + this.parseInlineMarkdown(this.escapeHtml(cell)) + '</th>';
                             });
                             contentBlocksHtml += '</tr></thead><tbody>';
                             for (let r = 1; r < rows.length; r++) {
                                 contentBlocksHtml += '<tr>';
                                 (rows[r] || []).forEach((cell, cIdx) => {
                                     const cs = colspans[r] && colspans[r][cIdx] > 1 ? ' colspan="' + colspans[r][cIdx] + '"' : '';
-                                    contentBlocksHtml += '<td class="border border-gray-200 p-2 text-sm text-gray-600"' + cs + '>' + this.escapeHtml(cell) + '</td>';
+                                    contentBlocksHtml += '<td class="border border-gray-200 p-2 text-sm text-gray-600"' + cs + _cellViewStyle(r, cIdx) + '>' + this.parseInlineMarkdown(this.escapeHtml(cell)) + '</td>';
                                 });
                                 contentBlocksHtml += '</tr>';
                             }
@@ -3380,21 +3400,31 @@
                     else if (block.type === 'p') { contentText += plain + '\n\n'; contentMarkdown += plain + '\n\n'; let rendered = this.parseInlineMarkdown ? this.parseInlineMarkdown(plain) : safe; contentHtml += '<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:10px 0;text-align:justify;">' + rendered + '</p>'; }
                     else if (block.type === 'img') { const imgUrl = this.resolveImageUrl(block.src || ''); const caption = block.caption || ''; if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" alt="' + this.escapeHtml(caption) + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>' + (caption ? '<div style="text-align:center;font-size:12px;color:#6b7280;font-style:italic;margin-top:4px;">' + this.escapeHtml(caption) + '</div>' : ''); }
                     else if (block.type === 'table') {
-                        // 【新增】表格导出渲染（支持colspan合并）
+                        // 【新增】表格导出渲染（支持colspan+对齐+样式）
                         const rows = block.rows || [];
                         const colspans = block.colspans || [];
+                        const aligns = block.aligns || [];
+                        const styles = block.styles || [];
+                        const _cellExportStyle = (r, c) => {
+                            const parts = ['border:1px solid #d1d5db;padding:8px;font-size:13px;'];
+                            const a = aligns[r] && aligns[r][c] ? aligns[r][c] : '';
+                            parts.push(a ? 'text-align:' + a : 'text-align:left');
+                            const s = styles[r] && styles[r][c] ? styles[r][c] : null;
+                            if (s) { if (s.color) parts.push('color:' + s.color); if (s.bg) parts.push('background-color:' + s.bg); }
+                            return parts.join(';');
+                        };
                         if (rows.length > 0) {
                             contentHtml += '<div style="margin:16px 0;"><table style="width:100%;border-collapse:collapse;">';
                             if (rows[0]) {
                                 contentHtml += '<tr style="background:#f3f4f6;">' + rows[0].map((c, cIdx) => {
                                     const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
-                                    return '<th style="border:1px solid #d1d5db;padding:8px;text-align:left;font-size:13px;"' + cs + '>' + this.escapeHtml(c) + '</th>';
+                                    return '<th style="' + _cellExportStyle(0, cIdx) + '"' + cs + '>' + this.escapeHtml(c) + '</th>';
                                 }).join('') + '</tr>';
                             }
                             for (let r = 1; r < rows.length; r++) {
                                 contentHtml += '<tr>' + (rows[r] || []).map((c, cIdx) => {
                                     const cs = colspans[r] && colspans[r][cIdx] > 1 ? ' colspan="' + colspans[r][cIdx] + '"' : '';
-                                    return '<td style="border:1px solid #d1d5db;padding:8px;font-size:13px;"' + cs + '>' + this.escapeHtml(c) + '</td>';
+                                    return '<td style="' + _cellExportStyle(r, cIdx) + '"' + cs + '>' + this.escapeHtml(c) + '</td>';
                                 }).join('') + '</tr>';
                             }
                             contentHtml += '</table></div>';
