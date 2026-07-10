@@ -265,6 +265,9 @@
             <button onclick="app.router('synopsis')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="synopsis">
                 <i class="fa-solid fa-film text-lg"></i><span class="text-[10px]">剧情</span>
             </button>
+            <a href="https://github.com/ZZQLittleBean/2nd-Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB-github.io" target="_blank" rel="noopener noreferrer" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-gray-900 w-full py-1">
+                <i class="fa-brands fa-github text-lg"></i><span class="text-[10px]">GitHub</span>
+            </a>
         </div>
     </nav>
 
@@ -347,6 +350,16 @@
                 </div>
                 </div><!-- /home-multi-col-container -->
             </div><!-- /home-layout-container -->
+            <!-- 首页底部：重新打开欢迎窗口 + GitHub入口 -->
+            <div class="flex items-center justify-center gap-4 pt-4 border-t border-gray-200 mt-4">
+                <button onclick="app.showWelcome()" class="text-xs text-gray-500 hover:text-indigo-600 transition flex items-center gap-1">
+                    <i class="fa-solid fa-hand-sparkles"></i> 欢迎窗口
+                </button>
+                <span class="text-gray-300">|</span>
+                <a href="https://github.com/ZZQLittleBean/2nd-Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB-github.io" target="_blank" rel="noopener noreferrer" class="text-xs text-gray-500 hover:text-gray-900 transition flex items-center gap-1">
+                    <i class="fa-brands fa-github"></i> GitHub
+                </a>
+            </div>
             <div class="text-center py-6">
                 <p class="text-xs text-gray-400">测试版本，请以实际为准</p>
             </div>
@@ -812,6 +825,45 @@
                 setTimeout(() => { try { this.router('home'); } catch (e2) {} }, 200);
             }
             try { this.initKeyboardListeners(); } catch (e) { /* ignore */ }
+            // 【新增】显示欢迎窗口（首次访问）
+            setTimeout(() => this._checkAndShowWelcome(), 300);
+        },
+
+        // 【新增】欢迎窗口（GitHub版）
+        _welcomeShown: false,
+        _checkAndShowWelcome: function() {
+            if (this._welcomeShown) return;
+            let welcomeFlag = false;
+            try { welcomeFlag = localStorage.getItem('novelWiki_welcomeShown') === '1'; } catch(e) {}
+            if (!welcomeFlag) { this.showWelcome(); }
+        },
+        showWelcome: function() {
+            this._welcomeShown = true;
+            const modal = document.getElementById('welcome-modal');
+            const customEl = document.getElementById('welcome-custom-content');
+            if (!modal) return;
+            if (customEl && this.data.settings) {
+                let customHtml = '';
+                if (this.data.settings.name) {
+                    customHtml += '<p class="font-medium text-gray-900 mb-1">本Wiki名称：' + this.escapeHtml(this.data.settings.name) + '</p>';
+                }
+                if (this.data.settings.globalNotice) {
+                    customHtml += '<p class="text-gray-600 mb-2">' + this.escapeHtml(this.data.settings.globalNotice) + '</p>';
+                }
+                if (this.data.settings.welcomeContent) {
+                    customHtml += '<div class="mt-2 pt-2 border-t border-gray-200">' + this.escapeHtml(this.data.settings.welcomeContent).replace(/\n/g, '<br>') + '</div>';
+                }
+                if (customHtml) {
+                    customEl.innerHTML = customHtml;
+                    customEl.classList.remove('hidden');
+                }
+            }
+            modal.classList.remove('hidden');
+        },
+        closeWelcome: function() {
+            const modal = document.getElementById('welcome-modal');
+            if (modal) modal.classList.add('hidden');
+            try { localStorage.setItem('novelWiki_welcomeShown', '1'); } catch(e) {}
         },
 
         // 【修复】从localStorage图片缓存恢复data URL，并清理无效格式
@@ -3414,7 +3466,7 @@
                             return parts.join(';');
                         };
                         if (rows.length > 0) {
-                            contentHtml += '<div style="margin:16px 0;"><table style="width:100%;border-collapse:collapse;">';
+                            contentHtml += '<div style="margin:16px 0;"><table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
                             if (rows[0]) {
                                 contentHtml += '<tr style="background:#f3f4f6;">' + rows[0].map((c, cIdx) => {
                                     const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
@@ -3808,6 +3860,29 @@
             });
         })();
     </script>
+
+    <!-- 【新增】欢迎窗口（GitHub版只含欢迎页） -->
+    <div id="welcome-modal" class="fixed inset-0 bg-black/50 z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div id="welcome-page">
+                <div class="p-8 text-center">
+                    <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fa-solid fa-book-open text-white text-2xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">欢迎访问「Glight」微光Wiki</h2>
+                    <p class="text-gray-500 text-sm mb-6">探索角色、世界观与错综复杂的关系网</p>
+                    <a href="https://github.com/ZZQLittleBean/2nd-Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB-github.io" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm mb-6">
+                        <i class="fa-brands fa-github"></i> GitHub 项目页
+                    </a>
+                    <!-- 自定义内容区域 -->
+                    <div id="welcome-custom-content" class="hidden text-left bg-gray-50 rounded-xl p-4 mb-6 text-sm text-gray-700"></div>
+                    <button onclick="app.closeWelcome()" class="w-full py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium">
+                        进入 Wiki
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
