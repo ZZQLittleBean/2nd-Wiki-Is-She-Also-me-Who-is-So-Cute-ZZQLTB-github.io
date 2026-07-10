@@ -759,6 +759,9 @@
                         } else {
                             console.log('[Wiki] 数据无变化');
                             this.hideLoadingState();
+                            // 【关键修复】showLoadingState('检查更新') 覆盖了已渲染的主页，
+                            // 数据无变化时必须重新 _finishLoading() 渲染，否则容器为空
+                            this._finishLoading();
                             // 图片已恢复，如果当前在剧情梗概页，刷新显示
                             if (this.data.currentView === 'synopsis') {
                                 this.router('synopsis');
@@ -1544,16 +1547,23 @@
                     else if (block.type === 'p') { let text = block.text || ''; text = this.parseContentText(text); html += `<p class="text-gray-600 leading-relaxed mb-4" style="white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${text}</p>`; }
                     else if (block.type === 'img') { const imgRef = block.src || ''; let imgSrc = this.resolveImageUrl(imgRef); const caption = block.caption || ''; html += `<div class="event-block-image"><img src="${imgSrc}" data-img-ref="${this.escapeHtml(imgRef)}" alt="${this.escapeHtml(caption)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'text-gray-400 py-4\'><i class=\'fa-solid fa-image text-2xl\'></i><p class=\'text-xs mt-1\'>图片加载失败</p></div>'">${caption ? `<div class="event-block-image-caption">${this.escapeHtml(caption)}</div>` : ''}</div>`; }
                     else if (block.type === 'table') {
-                        // 【新增】表格元件渲染
+                        // 【新增】表格元件渲染（支持colspan合并）
                         const rows = block.rows || [];
+                        const colspans = block.colspans || [];
                         if (rows.length > 0) {
                             html += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">';
                             html += '<thead class="bg-gray-100"><tr>';
-                            (rows[0] || []).forEach(cell => { html += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold">' + this.escapeHtml(cell) + '</th>'; });
+                            (rows[0] || []).forEach((cell, cIdx) => {
+                                const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
+                                html += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold"' + cs + '>' + this.escapeHtml(cell) + '</th>';
+                            });
                             html += '</tr></thead><tbody>';
                             for (let r = 1; r < rows.length; r++) {
                                 html += '<tr>';
-                                (rows[r] || []).forEach(cell => { html += '<td class="border border-gray-200 p-2 text-sm text-gray-600">' + this.escapeHtml(cell) + '</td>'; });
+                                (rows[r] || []).forEach((cell, cIdx) => {
+                                    const cs = colspans[r] && colspans[r][cIdx] > 1 ? ' colspan="' + colspans[r][cIdx] + '"' : '';
+                                    html += '<td class="border border-gray-200 p-2 text-sm text-gray-600"' + cs + '>' + this.escapeHtml(cell) + '</td>';
+                                });
                                 html += '</tr>';
                             }
                             html += '</tbody></table></div>';
@@ -2019,16 +2029,23 @@
                         const caption = block.caption || '';
                         contentBlocksHtml += `<div class="event-block-image"><img src="${imgSrc}" alt="${this.escapeHtml(caption)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'text-gray-400 py-4\'><i class=\'fa-solid fa-image text-2xl\'></i><p class=\'text-xs mt-1\'>图片加载失败</p></div>'">${caption ? `<div class="event-block-image-caption">${this.escapeHtml(caption)}</div>` : ''}</div>`;
                     } else if (block.type === 'table') {
-                        // 【新增】表格元件渲染
+                        // 【新增】表格元件渲染（支持colspan合并）
                         const rows = block.rows || [];
+                        const colspans = block.colspans || [];
                         if (rows.length > 0) {
                             contentBlocksHtml += '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">';
                             contentBlocksHtml += '<thead class="bg-gray-100"><tr>';
-                            (rows[0] || []).forEach(cell => { contentBlocksHtml += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold">' + this.escapeHtml(cell) + '</th>'; });
+                            (rows[0] || []).forEach((cell, cIdx) => {
+                                const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
+                                contentBlocksHtml += '<th class="border border-gray-200 p-2 text-xs text-gray-700 font-semibold"' + cs + '>' + this.escapeHtml(cell) + '</th>';
+                            });
                             contentBlocksHtml += '</tr></thead><tbody>';
                             for (let r = 1; r < rows.length; r++) {
                                 contentBlocksHtml += '<tr>';
-                                (rows[r] || []).forEach(cell => { contentBlocksHtml += '<td class="border border-gray-200 p-2 text-sm text-gray-600">' + this.escapeHtml(cell) + '</td>'; });
+                                (rows[r] || []).forEach((cell, cIdx) => {
+                                    const cs = colspans[r] && colspans[r][cIdx] > 1 ? ' colspan="' + colspans[r][cIdx] + '"' : '';
+                                    contentBlocksHtml += '<td class="border border-gray-200 p-2 text-sm text-gray-600"' + cs + '>' + this.escapeHtml(cell) + '</td>';
+                                });
                                 contentBlocksHtml += '</tr>';
                             }
                             contentBlocksHtml += '</tbody></table></div>';
@@ -3083,7 +3100,9 @@
                 item.className = 'synopsis-view-item';
                 item.id = `synopsis-item-${idx}`;
 
-                // 【重写】剧情梗概图片：直接参照词条图片机制使用 resolveImageUrl + 内联 onerror
+                // 【🛡️ 剧情梗概图片显示 — 保护区域开始】
+                // 必须使用 resolveImageUrl 统一解析，禁止改为 _resolveImageUrl 或其他专用解析函数
+                // 禁止添加 isLoadable 检查、异步加载、data-img-ref 等复杂机制
                 let imgHtml = '';
                 if (chapter.image) {
                     const imgUrl = this.resolveImageUrl(chapter.image);
@@ -3091,6 +3110,7 @@
                         imgHtml = '<img src="' + imgUrl + '" class="synopsis-view-image" alt="' + this.escapeHtml(chapter.title || '') + '" onerror="this.style.display=\'none\'">';
                     }
                 }
+                // 【🛡️ 剧情梗概图片显示 — 保护区域结束】
 
                 // 解析内容中的索引
                 let contentHtml = this.parseContentText(chapter.content || '');
@@ -3194,7 +3214,8 @@
             if (!numEl || !titleEl || !contentEl || !tooltip) { this.closeSynopsisTooltip(); return; }
             numEl.textContent = this.formatChapterNum(chapter.num);
             titleEl.textContent = chapter.title || '';
-            // 【重写】tooltip 图片：参照词条图片机制直接使用 resolveImageUrl
+            // 【🛡️ 剧情梗概tooltip图片 — 保护区域开始】
+            // 必须使用 resolveImageUrl 统一解析，禁止改为其他解析函数
             if (imgEl) {
                 if (chapter.image) {
                     const imgUrl = this.resolveImageUrl(chapter.image);
@@ -3207,6 +3228,7 @@
                     } else { imgEl.classList.add('hidden'); }
                 } else { imgEl.classList.add('hidden'); }
             }
+            // 【🛡️ 剧情梗概tooltip图片 — 保护区域结束】
             contentEl.innerHTML = this.parseContentText(chapter.content || '<span class="text-gray-400 italic">暂无内容</span>');
             const rect = triggerElement.getBoundingClientRect();
             const tooltipWidth = 450, tooltipHeight = 300;
@@ -3342,9 +3364,12 @@
             }
             let contentText = '', contentMarkdown = '', contentHtml = '';
             let coverImage = '';
-            if (version.images && version.images.cover) coverImage = version.images.cover;
-            else if (version.image) coverImage = version.image;
-            else if (version.images && version.images.card) coverImage = version.images.card;
+            // 【修复】活动页头图 + 解析{{IMG:}}引用
+            if (entry.type === 'event' && entry.headerImage) {
+                coverImage = this.resolveImageUrl(entry.headerImage);
+            } else if (version.images && version.images.cover) coverImage = this.resolveImageUrl(version.images.cover);
+            else if (version.image) coverImage = this.resolveImageUrl(version.image);
+            else if (version.images && version.images.card) coverImage = this.resolveImageUrl(version.images.card);
             if (version.blocks && version.blocks.length > 0) {
                 version.blocks.forEach(block => {
                     const raw = block.text || '';
@@ -3353,7 +3378,28 @@
                     if (block.type === 'h2') { contentText += plain + '\n\n'; contentMarkdown += '## ' + plain + '\n\n'; contentHtml += '<h2 style="font-size:22px;font-weight:bold;color:#1f2937;margin:28px 0 12px;border-bottom:2px solid #4f46e5;padding-bottom:8px;">' + safe + '</h2>'; }
                     else if (block.type === 'h3') { contentText += plain + '\n\n'; contentMarkdown += '### ' + plain + '\n\n'; contentHtml += '<h3 style="font-size:18px;font-weight:bold;color:#374151;margin:18px 0 8px;">' + safe + '</h3>'; }
                     else if (block.type === 'p') { contentText += plain + '\n\n'; contentMarkdown += plain + '\n\n'; let rendered = this.parseInlineMarkdown ? this.parseInlineMarkdown(plain) : safe; contentHtml += '<p style="font-size:15px;line-height:1.8;color:#4b5563;margin:10px 0;text-align:justify;">' + rendered + '</p>'; }
-                    else if (block.type === 'image') { const imgUrl = this.resolveImageUrl(block.src || ''); if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>'; }
+                    else if (block.type === 'img') { const imgUrl = this.resolveImageUrl(block.src || ''); const caption = block.caption || ''; if (imgUrl) contentHtml += '<div style="margin:16px 0;text-align:center;"><img src="' + imgUrl + '" alt="' + this.escapeHtml(caption) + '" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display=\'none\'"/></div>' + (caption ? '<div style="text-align:center;font-size:12px;color:#6b7280;font-style:italic;margin-top:4px;">' + this.escapeHtml(caption) + '</div>' : ''); }
+                    else if (block.type === 'table') {
+                        // 【新增】表格导出渲染（支持colspan合并）
+                        const rows = block.rows || [];
+                        const colspans = block.colspans || [];
+                        if (rows.length > 0) {
+                            contentHtml += '<div style="margin:16px 0;"><table style="width:100%;border-collapse:collapse;">';
+                            if (rows[0]) {
+                                contentHtml += '<tr style="background:#f3f4f6;">' + rows[0].map((c, cIdx) => {
+                                    const cs = colspans[0] && colspans[0][cIdx] > 1 ? ' colspan="' + colspans[0][cIdx] + '"' : '';
+                                    return '<th style="border:1px solid #d1d5db;padding:8px;text-align:left;font-size:13px;"' + cs + '>' + this.escapeHtml(c) + '</th>';
+                                }).join('') + '</tr>';
+                            }
+                            for (let r = 1; r < rows.length; r++) {
+                                contentHtml += '<tr>' + (rows[r] || []).map((c, cIdx) => {
+                                    const cs = colspans[r] && colspans[r][cIdx] > 1 ? ' colspan="' + colspans[r][cIdx] + '"' : '';
+                                    return '<td style="border:1px solid #d1d5db;padding:8px;font-size:13px;"' + cs + '>' + this.escapeHtml(c) + '</td>';
+                                }).join('') + '</tr>';
+                            }
+                            contentHtml += '</table></div>';
+                        }
+                    }
                 });
             }
             const mark = this.data.settings?.exportMark;
