@@ -734,7 +734,7 @@
             }
 
             const loadedData = await this.fetchFromNetwork();
-            this.hideLoadingState();
+            // 【关键修复】hideLoadingState 移到 _finishLoading 之后，避免容器在渲染前变空
 
             if (loadedData) {
                 const validation = this.validateData(loadedData);
@@ -754,9 +754,11 @@
                         if (hasNewData) {
                             console.log('[Wiki] 数据变化:', oldCount, '->', entryCount);
                             this._finishLoading();
+                            this.hideLoadingState();
                             this.showToast('已更新到最新数据', 'success', 2000);
                         } else {
                             console.log('[Wiki] 数据无变化');
+                            this.hideLoadingState();
                             // 图片已恢复，如果当前在剧情梗概页，刷新显示
                             if (this.data.currentView === 'synopsis') {
                                 this.router('synopsis');
@@ -765,6 +767,7 @@
                     } else {
                         // 无缓存 → 首次渲染
                         this._finishLoading();
+                        this.hideLoadingState();
                     }
                 } else if (!cacheLoaded) {
                     this.showLoadError('数据格式错误: ' + validation.error);
@@ -787,6 +790,8 @@
 
         // 【新增】统一的加载完成处理（避免重复代码）
         _finishLoading() {
+            // 【关键修复】强制清除加载遮罩（双重保险）
+            try { this.hideLoadingState(); } catch (e) { /* ignore */ }
             try {
                 if (this.data.chapters && this.data.chapters.length > 0) {
                     this.syncBodyEntriesWithChapters();
@@ -797,7 +802,6 @@
                     document.documentElement.style.setProperty('--custom-font', this.data.settings.customFont);
                 }
             } catch (e) { /* ignore */ }
-            try { this.hideLoadingState(); } catch (e) { /* ignore */ }
             try { this.setupUI(); } catch (e) { console.warn('[Finish] setupUI 失败:', e); }
             // 【修复】确保 router('home') 被调用，即使前面步骤出错
             try { this.router('home'); } catch (e) {
@@ -1234,8 +1238,9 @@
             // 欢迎标题
             const welcomeTitle = clone.getElementById('welcome-title');
             const welcomeSubtitle = clone.getElementById('welcome-subtitle');
-            if (welcomeTitle) welcomeTitle.textContent = this.data.settings.welcomeTitle || '欢迎来到 Wiki';
-            if (welcomeSubtitle) welcomeSubtitle.textContent = this.data.settings.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
+            const settings = this.data.settings || {};
+            if (welcomeTitle) welcomeTitle.textContent = settings.welcomeTitle || '欢迎来到 Wiki';
+            if (welcomeSubtitle) welcomeSubtitle.textContent = settings.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
 
             // 公告
             const activeAnn = this.data.announcements?.find(a => a.isActive);
