@@ -3607,15 +3607,6 @@
 
         parseMarkdown(text) {
             if (!text) return '';
-            // 【核心】行内Markdown处理函数（可被列表项复用）
-            const processInline = (t) => {
-                t = t.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
-                t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                t = t.replace(/\*(.*?)\*/g, '<em>$1</em>');
-                t = t.replace(/~~(.*?)~~/g, '<del>$1</del>');
-                t = t.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">$1</code>');
-                return t;
-            };
             let html = this.escapeHtml(text);
             // 标题
             html = html.replace(/^###### (.*$)/gim, '<h6 class="text-sm font-bold text-gray-700 mt-4 mb-2">$1</h6>');
@@ -3624,30 +3615,41 @@
             html = html.replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold text-gray-800 mt-6 mb-3 border-b pb-1">$1</h3>');
             html = html.replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">$1</h2>');
             html = html.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold text-gray-900 mt-8 mb-4">$1</h1>');
-            // 【关键修复】先捕获列表项，对内容应用行内处理后组装
+            // 【核心修复】用不含*的占位符保护列表项，避免粗斜体正则误匹配行首* 
             const listItems = [];
             html = html.replace(/^([\-\*]) (.*$)/gim, (match, bullet, content) => {
-                listItems.push(processInline(content));
-                return '##LISTITEM##' + (listItems.length - 1) + '##END##\n';
+                listItems.push(content);  // 保存原始内容（含*），稍后处理
+                return '[[LISTITEM:' + (listItems.length - 1) + ']]\n';
             });
             html = html.replace(/^\d+\. (.*$)/gim, (match, content) => {
-                listItems.push(processInline(content));
-                return '##OLITEM##' + (listItems.length - 1) + '##END##\n';
+                listItems.push(content);
+                return '[[OLITEM:' + (listItems.length - 1) + ']]\n';
             });
-            // 恢复列表项（内容已应用行内样式）
-            html = html.replace(/##LISTITEM##(\d+)##END##/g, (match, idx) => {
-                const content = listItems[parseInt(idx)];
+            // 粗斜体（全局处理，列表项已被占位符保护不会误匹配）
+            html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            // 恢复列表项（对内容应用行内样式）
+            const processInline = (t) => {
+                t = t.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+                t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                t = t.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                t = t.replace(/~~(.*?)~~/g, '<del>$1</del>');
+                t = t.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">$1</code>');
+                return t;
+            };
+            html = html.replace(/\[\[LISTITEM:(\d+)\]\]/g, (match, idx) => {
+                const content = processInline(listItems[parseInt(idx)]);
                 return '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>' + content + '</span></li>';
             });
-            html = html.replace(/##OLITEM##(\d+)##END##/g, (match, idx) => {
+            html = html.replace(/\[\[OLITEM:(\d+)\]\]/g, (match, idx) => {
                 const rawContent = listItems[parseInt(idx)];
-                // 从已处理的HTML中提取编号和剩余内容
                 const numMatch = rawContent.match(/^(\d+)\.\s*(.*)/);
                 const num = numMatch ? numMatch[1] : '';
-                const rest = numMatch ? numMatch[2] : rawContent;
+                const rest = numMatch ? processInline(numMatch[2]) : processInline(rawContent);
                 return '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 font-bold min-w-[1.5rem]">' + num + '.</span><span>' + rest + '</span></li>';
             });
-            // 其他 Markdown 格式
+            // 其他 Markdown 格式（仅处理非列表项内容）
             html = html.replace(/~~(.*?)~~/g, '<del>$1</del>');
             html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">$1</code>');
             html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm my-4"><code>$1</code></pre>');
