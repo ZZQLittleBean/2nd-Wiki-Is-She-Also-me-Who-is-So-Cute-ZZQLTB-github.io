@@ -3608,15 +3608,40 @@
         parseMarkdown(text) {
             if (!text) return '';
             let html = this.escapeHtml(text);
+            // 标题
             html = html.replace(/^###### (.*$)/gim, '<h6 class="text-sm font-bold text-gray-700 mt-4 mb-2">$1</h6>');
             html = html.replace(/^##### (.*$)/gim, '<h5 class="text-base font-bold text-gray-700 mt-4 mb-2">$1</h5>');
             html = html.replace(/^#### (.*$)/gim, '<h4 class="text-lg font-bold text-gray-800 mt-4 mb-2">$1</h4>');
             html = html.replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold text-gray-800 mt-6 mb-3 border-b pb-1">$1</h3>');
             html = html.replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">$1</h2>');
             html = html.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold text-gray-900 mt-8 mb-4">$1</h1>');
+            // 【关键修复】先捕获列表项，避免 * 被斜体正则错误匹配
+            const listItems = [];
+            html = html.replace(/^([\-\*]) (.*$)/gim, (match, bullet, content) => {
+                listItems.push(content);
+                return '##LISTITEM##' + (listItems.length - 1) + '##END##\n';
+            });
+            html = html.replace(/^\d+\. (.*$)/gim, (match, content) => {
+                listItems.push(content);
+                return '##OLITEM##' + (listItems.length - 1) + '##END##\n';
+            });
+            // 粗斜体（列表项内容已安全隔离）
             html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
             html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            // 恢复列表项（行内样式已处理完毕）
+            html = html.replace(/##LISTITEM##(\d+)##END##/g, (match, idx) => {
+                const content = listItems[parseInt(idx)];
+                return '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>' + content + '</span></li>';
+            });
+            html = html.replace(/##OLITEM##(\d+)##END##/g, (match, idx) => {
+                const content = listItems[parseInt(idx)];
+                const numMatch = content.match(/^(\d+)\.\s*(.*)/);
+                const num = numMatch ? numMatch[1] : '';
+                const rest = numMatch ? numMatch[2] : content;
+                return '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 font-bold min-w-[1.5rem]">' + num + '.</span><span>' + rest + '</span></li>';
+            });
+            // 其他 Markdown 格式
             html = html.replace(/~~(.*?)~~/g, '<del>$1</del>');
             html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">$1</code>');
             html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm my-4"><code>$1</code></pre>');
@@ -3624,10 +3649,7 @@
             html = html.replace(/^---$/gim, '<hr class="my-6 border-gray-200">');
             html = html.replace(/^\* \* \*$/gim, '<hr class="my-6 border-gray-200">');
             html = html.replace(/^___$/gim, '<hr class="my-6 border-gray-200">');
-            html = html.replace(/^\- (.*$)/gim, '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>$1</span></li>');
-            html = html.replace(/^\* (.*$)/gim, '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>$1</span></li>');
-            html = html.replace(/^\d+\. (.*$)/gim, '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 font-bold min-w-[1.5rem]">$&</span></li>');
-            html = html.replace(/<span class="text-indigo-500 font-bold min-w-\[1\.5rem\]">(\d+)\.\s(.*?)<\/span>/g, '<span class="text-indigo-500 font-bold min-w-[1.5rem]">$1.</span><span>$2</span>');
+            // 链接和图片
             html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank" class="text-indigo-600 hover:underline">$1</a>');
             html = html.replace(/<(https?:\/\/[^ >]+)>/g, '<a href="$1" target="_blank" class="text-indigo-600 hover:underline">$1</a>');
             html = html.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded-lg my-4">');
