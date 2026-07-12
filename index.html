@@ -3607,6 +3607,15 @@
 
         parseMarkdown(text) {
             if (!text) return '';
+            // 【核心】行内Markdown处理函数（可被列表项复用）
+            const processInline = (t) => {
+                t = t.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+                t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                t = t.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                t = t.replace(/~~(.*?)~~/g, '<del>$1</del>');
+                t = t.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">$1</code>');
+                return t;
+            };
             let html = this.escapeHtml(text);
             // 标题
             html = html.replace(/^###### (.*$)/gim, '<h6 class="text-sm font-bold text-gray-700 mt-4 mb-2">$1</h6>');
@@ -3615,30 +3624,27 @@
             html = html.replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold text-gray-800 mt-6 mb-3 border-b pb-1">$1</h3>');
             html = html.replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">$1</h2>');
             html = html.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold text-gray-900 mt-8 mb-4">$1</h1>');
-            // 【关键修复】先捕获列表项，避免 * 被斜体正则错误匹配
+            // 【关键修复】先捕获列表项，对内容应用行内处理后组装
             const listItems = [];
             html = html.replace(/^([\-\*]) (.*$)/gim, (match, bullet, content) => {
-                listItems.push(content);
+                listItems.push(processInline(content));
                 return '##LISTITEM##' + (listItems.length - 1) + '##END##\n';
             });
             html = html.replace(/^\d+\. (.*$)/gim, (match, content) => {
-                listItems.push(content);
+                listItems.push(processInline(content));
                 return '##OLITEM##' + (listItems.length - 1) + '##END##\n';
             });
-            // 粗斜体（列表项内容已安全隔离）
-            html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
-            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            // 恢复列表项（行内样式已处理完毕）
+            // 恢复列表项（内容已应用行内样式）
             html = html.replace(/##LISTITEM##(\d+)##END##/g, (match, idx) => {
                 const content = listItems[parseInt(idx)];
                 return '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 mt-1.5 text-xs">\u25cf</span><span>' + content + '</span></li>';
             });
             html = html.replace(/##OLITEM##(\d+)##END##/g, (match, idx) => {
-                const content = listItems[parseInt(idx)];
-                const numMatch = content.match(/^(\d+)\.\s*(.*)/);
+                const rawContent = listItems[parseInt(idx)];
+                // 从已处理的HTML中提取编号和剩余内容
+                const numMatch = rawContent.match(/^(\d+)\.\s*(.*)/);
                 const num = numMatch ? numMatch[1] : '';
-                const rest = numMatch ? numMatch[2] : content;
+                const rest = numMatch ? numMatch[2] : rawContent;
                 return '<li class="ml-4 my-1 flex items-start gap-2"><span class="text-indigo-500 font-bold min-w-[1.5rem]">' + num + '.</span><span>' + rest + '</span></li>';
             });
             // 其他 Markdown 格式
