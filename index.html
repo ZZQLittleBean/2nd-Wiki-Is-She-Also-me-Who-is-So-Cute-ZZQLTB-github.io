@@ -152,6 +152,9 @@
         /* 词条索引链接样式 */
         .entry-index-link { color: #4f46e5; text-decoration: none; border-bottom: 1px dashed #4f46e5; cursor: pointer; transition: all 0.2s; }
         .entry-index-link:hover { background: #eef2ff; padding: 0 4px; border-radius: 4px; }
+        .entry-external-link { color: #9333ea; text-decoration: none; border-bottom: 1px dashed #9333ea; cursor: pointer; transition: all 0.2s; }
+        .entry-external-link:hover { background: #f3e8ff; padding: 0 4px; border-radius: 4px; }
+        .entry-external-link i { color: #a855f7; font-size: 0.75em; margin-right: 4px; }
 
         /* 空状态提示 */
         .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
@@ -3860,6 +3863,22 @@
             });
         })();
     </script>
+
+    <!-- 【新增】外链跳转二次确认弹窗 -->
+    <div id="external-link-confirm-modal" class="fixed inset-0 bg-black/50 z-[10002] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-arrow-up-right-from-square text-amber-600 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">该内容非本Wiki内容</h3>
+            <p class="text-gray-500 text-sm mb-2">是否跳转到外部链接？</p>
+            <p id="external-link-url-display" class="text-xs text-gray-400 break-all mb-6 bg-gray-50 rounded-lg p-2"></p>
+            <div class="flex gap-3">
+                <button onclick="app.cancelExternalLink()" class="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition font-medium">取消</button>
+                <button onclick="app.proceedExternalLink()" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-medium">确定跳转</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 【新增】欢迎窗口（GitHub版只含欢迎页） -->
     <div id="welcome-modal" class="fixed inset-0 bg-black/50 z-[9999] hidden flex items-center justify-center p-4">
