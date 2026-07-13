@@ -534,6 +534,14 @@
                         <i class="fa-solid fa-circle-info mr-1"></i>
                         导出内容末尾将包含管理员设置的标记信息（如有设置）
                     </div>
+                    <!-- 【新增】复制词条链接 -->
+                    <div class="border-t border-gray-100 pt-4">
+                        <button onclick="app.copyEntryLink()" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-200 hover:border-indigo-300 transition font-medium">
+                            <i class="fa-solid fa-link"></i>
+                            <span>复制词条链接</span>
+                            <span class="text-xs text-indigo-400 ml-1">(通过链接直达此版本)</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -830,6 +838,68 @@
             try { this.initKeyboardListeners(); } catch (e) { /* ignore */ }
             // 【新增】显示欢迎窗口（首次访问）
             setTimeout(() => this._checkAndShowWelcome(), 300);
+            // 【新增】解析 URL hash 并跳转到对应词条
+            this._handleUrlHash();
+        },
+
+        // ========== 词条链接直达（URL hash 路由） ==========
+        _handleUrlHash() {
+            const hash = window.location.hash;
+            if (!hash || hash.length <= 1) return;
+
+            // 解析 hash: #entry=xxx&version=xxx
+            const params = new URLSearchParams(hash.substring(1));
+            const entryId = params.get('entry');
+            const versionId = params.get('version');
+
+            if (!entryId) return;
+
+            console.log('[URL Hash] 检测到词条链接:', { entryId, versionId });
+
+            // 等待数据加载完成后跳转
+            const waitForDataAndJump = () => {
+                if (!this._loaded || !this.data.entries || this.data.entries.length === 0) {
+                    console.log('[URL Hash] 数据未加载，等待...');
+                    setTimeout(waitForDataAndJump, 200);
+                    return;
+                }
+
+                const entry = this.data.entries.find(e => e.id === entryId);
+                if (!entry) {
+                    console.warn('[URL Hash] 词条不存在:', entryId);
+                    this.showToast('词条不存在或已被删除', 'warning');
+                    // 清除 hash，避免下次加载时重复触发
+                    history.replaceState(null, '', window.location.pathname + window.location.search);
+                    return;
+                }
+
+                // 查找版本
+                let targetVersionId = versionId;
+                if (targetVersionId && !entry.versions.find(v => v.vid === targetVersionId)) {
+                    console.warn('[URL Hash] 版本不存在，使用默认版本:', targetVersionId);
+                    targetVersionId = null;
+                }
+                if (!targetVersionId) {
+                    const visibleVersion = this.getVisibleVersion(entry);
+                    targetVersionId = visibleVersion ? visibleVersion.vid : entry.versions[0]?.vid;
+                }
+
+                console.log('[URL Hash] 跳转到词条:', entry.code, '版本:', targetVersionId);
+                this.openEntry(entryId, targetVersionId);
+
+                // 清除 hash，避免下次加载时重复触发
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            };
+
+            // 根据当前加载状态决定等待时间
+            if (this._loaded) {
+                // 数据已加载，直接跳转
+                waitForDataAndJump();
+            } else {
+                // 数据未加载，等待
+                console.log('[URL Hash] 数据未加载，等待初始化完成...');
+                waitForDataAndJump();
+            }
         },
 
         // 【新增】欢迎窗口（GitHub版）
@@ -3406,6 +3476,55 @@
         closeShareDialog() {
             document.querySelectorAll('[data-share-dialog]').forEach(el => el.remove());
         },
+
+        // 【新增】生成词条链接
+        generateEntryLink() {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            if (!entry) return null;
+            const versionId = this.data.viewingVersionId || entry.versions[0]?.vid;
+            const baseUrl = window.location.origin + window.location.pathname;
+            return `${baseUrl}#entry=${entry.id}&version=${versionId}`;
+        },
+
+        // 【新增】复制词条链接到剪贴板
+        async copyEntryLink() {
+            const link = this.generateEntryLink();
+            if (!link) {
+                this.showToast('无法生成链接', 'error');
+                return;
+            }
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(link);
+                } else {
+                    // 降级方案：创建临时textarea
+                    const textarea = document.createElement('textarea');
+                    textarea.value = link;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                }
+                this.showToast('链接已复制到剪贴板', 'success');
+                this.closeShareDialog();
+            } catch (e) {
+                console.error('[CopyLink] 复制失败:', e);
+                // 降级：显示链接让用户手动复制
+                const textarea = document.createElement('textarea');
+                textarea.value = link;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                this.showToast('链接已复制（降级模式）', 'success');
+                this.closeShareDialog();
+            }
+        },
+
         _stripIndexLinks(text) {
             if (!text) return '';
             return text
