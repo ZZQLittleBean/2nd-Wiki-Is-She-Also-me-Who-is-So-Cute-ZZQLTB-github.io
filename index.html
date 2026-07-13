@@ -2269,6 +2269,13 @@
             if (!text) return '';
             let html = this.escapeHtml(text);
 
+            // 0. 【新增】处理外链格式 [[显示文本|url:https://...]]
+            html = html.replace(/\[\[([^\]|]+)\|url:([^\]]+)\]\]/g, (match, displayText, url) => {
+                const cleanUrl = url.trim();
+                const cleanText = displayText.trim();
+                return '<a href="' + cleanUrl + '" class="entry-external-link" target="_blank" rel="noopener noreferrer" onclick="app.confirmExternalLink(event, \'' + cleanUrl.replace(/'/g, "\\'") + '\'); return false;"><i class="fa-solid fa-arrow-up-right-from-square text-xs mr-1"></i>' + cleanText + '</a>';
+            });
+
             // 1. 处理词条链接 - 新格式 [[entryId|versionId:displayText]]
             // 【修复】使用更精确的正则，避免末尾字符丢失
             html = html.replace(/\[\[([^\]|]+)\|([^:\]]+):([^\]]+)\]\]/g, (match, entryId, versionId, displayText) => {
@@ -2347,6 +2354,38 @@
             html = html.replace(/\n/g, '<br>');
 
             return html;
+        },
+
+        // ========== 外链跳转二次确认 ==========
+        _pendingExternalUrl: null,
+
+        confirmExternalLink(event, url) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            this._pendingExternalUrl = url;
+            const modal = document.getElementById('external-link-confirm-modal');
+            const urlDisplay = document.getElementById('external-link-url-display');
+            if (modal && urlDisplay) {
+                urlDisplay.textContent = url;
+                modal.classList.remove('hidden');
+            }
+        },
+
+        cancelExternalLink() {
+            this._pendingExternalUrl = null;
+            const modal = document.getElementById('external-link-confirm-modal');
+            if (modal) modal.classList.add('hidden');
+        },
+
+        proceedExternalLink() {
+            const modal = document.getElementById('external-link-confirm-modal');
+            if (modal) modal.classList.add('hidden');
+            if (this._pendingExternalUrl) {
+                window.open(this._pendingExternalUrl, '_blank', 'noopener,noreferrer');
+                this._pendingExternalUrl = null;
+            }
         },
 
         // 行内Markdown解析（用于subtitle等短文本）
