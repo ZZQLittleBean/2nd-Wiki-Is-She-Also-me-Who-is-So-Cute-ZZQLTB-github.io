@@ -11,6 +11,7 @@
     <!-- 构建时间戳，用于确认版本 -->
     <meta name="wiki-build" content="v2-fix4">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
@@ -205,6 +206,123 @@
         .home-col-btn { background: white; border-color: #d1d5db; color: #6b7280; }
         .home-col-btn:hover { border-color: #4f46e5; color: #4f46e5; }
         .home-col-btn.active { background: #4f46e5; border-color: #4f46e5; color: white; }
+
+        /* ========== 主题变量（与本地版同步） ========== */
+        :root {
+            --app-bg: #f3f4f6;
+            --app-text: #1f2937;
+            --app-card: #ffffff;
+            --app-border: #e5e7eb;
+            --app-muted: #6b7280;
+            --app-accent: #4f46e5;
+        }
+        body { background-color: var(--app-bg); color: var(--app-text); }
+        body.theme-dark {
+            --app-bg: #10151f;
+            --app-text: #e2e8f0;
+            --app-card: #1a2332;
+            --app-border: #2d3a4d;
+            --app-muted: #94a3b8;
+            --app-accent: #818cf8;
+        }
+        body.theme-bg-image {
+            background-image: var(--app-bg-image);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        body.theme-dark .bg-white,
+        body.theme-custom .bg-white { background-color: var(--app-card) !important; }
+        body.theme-dark .bg-gray-50,
+        body.theme-custom .bg-gray-50 { background-color: color-mix(in srgb, var(--app-card) 82%, transparent) !important; }
+        body.theme-dark .bg-gray-100,
+        body.theme-custom .bg-gray-100 { background-color: color-mix(in srgb, var(--app-card) 90%, transparent) !important; }
+        body.theme-dark .text-gray-900,
+        body.theme-custom .text-gray-900,
+        body.theme-dark .text-gray-800,
+        body.theme-custom .text-gray-800 { color: var(--app-text) !important; }
+        body.theme-dark .text-gray-700,
+        body.theme-custom .text-gray-700,
+        body.theme-dark .text-gray-600,
+        body.theme-custom .text-gray-600,
+        body.theme-dark .text-gray-500,
+        body.theme-custom .text-gray-500 { color: var(--app-muted) !important; }
+        body.theme-dark .border-gray-100,
+        body.theme-custom .border-gray-100,
+        body.theme-dark .border-gray-200,
+        body.theme-custom .border-gray-200 { border-color: var(--app-border) !important; }
+        body.theme-dark header,
+        body.theme-custom header { background-color: var(--app-card) !important; }
+
+        /* ========== 标签页（浏览器式，与本地版同步） ========== */
+        #tab-bar { scrollbar-width: thin; }
+        #tab-bar::-webkit-scrollbar { height: 4px; }
+        .tab-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px 5px;
+            font-size: 12px;
+            color: #4b5563;
+            background: rgba(243,244,246,.9);
+            border: 1px solid var(--app-border);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            white-space: nowrap;
+            max-width: 220px;
+            min-width: 90px;
+            flex-shrink: 0;
+            transition: all .15s;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body.theme-dark .tab-item { color: #cbd5e1; background: rgba(26,35,50,.8); }
+        .tab-item:hover { background: rgba(229,231,235,.95); }
+        body.theme-dark .tab-item:hover { background: rgba(45,58,77,.95); }
+        .tab-item.active {
+            background: var(--app-card);
+            color: var(--app-text);
+            font-weight: 600;
+            box-shadow: 0 -2px 6px rgba(0,0,0,.05);
+        }
+        .tab-item .tab-icon { font-size: 10px; opacity: .7; }
+        .tab-item .tab-title { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+        .tab-item .tab-version-title {
+            color: #9ca3af;
+            font-size: 10px;
+            margin-left: 2px;
+            font-weight: 400;
+            white-space: nowrap;
+        }
+        .tab-item.active .tab-version-title { color: #6b7280; }
+        .tab-main-title { overflow: hidden; text-overflow: ellipsis; }
+        .tab-item .tab-close {
+            width: 16px; height: 16px; border-radius: 4px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #9ca3af; flex-shrink: 0;
+        }
+        .tab-item .tab-close:hover { background: #fecaca; color: #dc2626; }
+        .tab-item.tab-home { background: transparent; border-color: transparent; min-width: 56px; }
+        .tab-item.tab-home:hover { background: rgba(229,231,235,.6); }
+        .tab-item.tab-home.active { background: var(--app-card); border-color: var(--app-border); }
+        .sortable-ghost { opacity: .4; background: #e0e7ff !important; }
+
+        .app-tool-btn {
+            width: 34px; height: 34px; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: #6b7280; background: transparent; border: 1px solid transparent;
+            cursor: pointer; transition: all .15s;
+        }
+        .app-tool-btn:hover { background: rgba(79,70,229,.08); color: #4f46e5; }
+        body.theme-dark .app-tool-btn { color: #cbd5e1; }
+        body.theme-dark .app-tool-btn:hover { background: rgba(129,140,248,.12); color: #a5b4fc; }
+
+        .theme-modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .theme-modal-box { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+        body.theme-dark .theme-modal-box { background: #1a2332; color: #e2e8f0; }
+        .theme-modal-box input[type=color] { width: 44px; height: 32px; border-radius: 6px; border: 1px solid #d1d5db; cursor: pointer; }
+        .theme-modal-box input[type=text] { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 12px; width: 100%; }
     </style>
 </head>
 <body class="h-screen flex flex-col text-gray-800">
@@ -236,8 +354,19 @@
                 <i class="fa-solid fa-search absolute left-3 top-2 text-gray-400 text-xs"></i>
                 <div id="search-dropdown" class="search-dropdown hidden"></div>
             </div>
+            <button class="app-tool-btn" title="切换主题（浅色/深色/自定义）" onclick="app.toggleThemeMode()">
+                <i class="fa-solid fa-palette"></i>
+            </button>
         </div>
     </header>
+
+    <!-- 标签页栏（浏览器式；有词条标签时显示，"首页"固定置前） -->
+    <div id="tab-bar-wrapper" class="hidden shrink-0 select-none px-2 pt-1.5 bg-gray-50/80 backdrop-blur border-b border-gray-200" style="min-height:34px;">
+        <div id="tab-bar" class="flex items-end gap-1 overflow-x-auto max-w-full"></div>
+    </div>
+
+    <!-- 词条标签内容容器 -->
+    <div id="tab-container" class="hidden flex-1 overflow-hidden relative bg-gray-50"></div>
 
     <!-- 时间轴选择条 -->
     <div id="timeline-bar" class="bg-indigo-50 border-b border-indigo-100 px-4 py-2 flex items-center gap-3 shrink-0 text-sm hidden">
@@ -701,6 +830,302 @@
             } catch (e) {}
         },
 
+        // ==================== 标签页系统（与本地版同步） ====================
+        tabsSystem: {
+            list: [],
+            activeTabId: null,
+
+            init() {
+                this.list = [];
+                this.activeTabId = null;
+                this.renderTabBar();
+                const bar = document.getElementById('tab-bar');
+                if (bar && typeof Sortable !== 'undefined') {
+                    new Sortable(bar, {
+                        animation: 150,
+                        filter: '.tab-home',
+                        draggable: '.tab-item:not(.tab-home)',
+                        ghostClass: 'sortable-ghost',
+                        onEnd: () => {
+                            const order = [];
+                            bar.querySelectorAll('.tab-item[data-tab-id]').forEach(el => {
+                                const tab = this.list.find(t => t.id === el.dataset.tabId);
+                                if (tab) order.push(tab);
+                            });
+                            if (order.length === this.list.length) this.list = order;
+                        }
+                    });
+                }
+            },
+
+            hasActiveEntryTab() {
+                return !!this.list.find(t => t.id === this.activeTabId);
+            },
+
+            getActivePane() {
+                return document.querySelector('.tab-pane[data-pane-id="' + this.activeTabId + '"]');
+            },
+
+            getEntryTitle(entry, versionId) {
+                if (!entry) return '词条';
+                if (versionId) {
+                    const v = entry.versions.find(x => x.vid === versionId);
+                    if (v && v.title) return v.title;
+                }
+                try {
+                    const vv = app.getVisibleVersion ? app.getVisibleVersion(entry) : null;
+                    if (vv && vv.title) return vv.title;
+                } catch (e) {}
+                return entry.code || entry.id;
+            },
+
+            ensureEntryTab(entryId, versionId) {
+                if (!entryId) return;
+                const entry = (app.data.entries || []).find(e => e.id === entryId);
+                const targetVid = versionId || (entry && entry.versions[0] && entry.versions[0].vid) || null;
+                let tab = this.list.find(t => t.entryId === entryId && t.versionId === targetVid);
+                if (!tab) {
+                    tab = {
+                        id: 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+                        kind: 'entry',
+                        entryId: entryId,
+                        versionId: targetVid,
+                        title: this.getEntryTitle(entry, targetVid),
+                        entryTitle: this.getEntryTitle(entry, null),
+                        code: entry ? (entry.code || '') : ''
+                    };
+                    this.list.push(tab);
+                } else if (targetVid) {
+                    tab.title = this.getEntryTitle(entry, targetVid);
+                    tab.entryTitle = this.getEntryTitle(entry, null);
+                }
+                this.activeTabId = tab.id;
+                app.data.editingId = entryId;
+                if (targetVid) app.data.viewingVersionId = targetVid;
+                this.renderTabBar();
+                this.activateTab(tab.id, { render: true });
+            },
+
+            activateTab(tabId) {
+                const tab = this.list.find(t => t.id === tabId);
+                if (!tab) return;
+                this.activeTabId = tabId;
+                app.data.currentView = 'detail';
+                const mainContainer = document.getElementById('main-container');
+                const tabContainer = document.getElementById('tab-container');
+                const tabBarWrapper = document.getElementById('tab-bar-wrapper');
+                if (mainContainer) mainContainer.classList.add('hidden');
+                if (tabContainer) { tabContainer.classList.remove('hidden'); tabContainer.style.display = 'block'; }
+                if (tabBarWrapper) tabBarWrapper.classList.remove('hidden');
+                let pane = document.querySelector('.tab-pane[data-pane-id="' + tabId + '"]');
+                if (!pane) {
+                    pane = document.createElement('div');
+                    pane.className = 'tab-pane h-full overflow-hidden';
+                    pane.dataset.paneId = tabId;
+                    if (tabContainer) tabContainer.appendChild(pane);
+                }
+                tabContainer.querySelectorAll('.tab-pane').forEach(p => {
+                    p.style.display = (p.dataset.paneId === tabId) ? 'block' : 'none';
+                });
+                this.renderTabBar();
+                if (typeof app.updateUI === 'function') app.updateUI();
+                try {
+                    app.data.viewingVersionId = tab.versionId || app.data.viewingVersionId;
+                    if (typeof app.renderDetail === 'function') app.renderDetail(pane);
+                    else pane.innerHTML = '<div class="p-8 text-center text-gray-400">详情模块未加载</div>';
+                } catch (e) {
+                    console.error('[Tabs] 渲染标签内容失败:', e);
+                    pane.innerHTML = '<div class="p-8 text-center text-red-500">渲染失败: ' + (e.message || e) + '</div>';
+                }
+            },
+
+            activateHomeTab() {
+                this.activeTabId = 'home';
+                const mainContainer = document.getElementById('main-container');
+                const tabContainer = document.getElementById('tab-container');
+                const tabBarWrapper = document.getElementById('tab-bar-wrapper');
+                if (mainContainer) mainContainer.classList.remove('hidden');
+                if (tabContainer) { tabContainer.classList.add('hidden'); tabContainer.style.display = 'none'; }
+                if (tabBarWrapper && this.list.length === 0) tabBarWrapper.classList.add('hidden');
+                this.renderTabBar();
+                if (typeof app.router === 'function') app.router('home');
+            },
+
+            closeTab(tabId) {
+                const idx = this.list.findIndex(t => t.id === tabId);
+                if (idx === -1) return;
+                const wasActive = this.activeTabId === tabId;
+                this.list.splice(idx, 1);
+                const pane = document.querySelector('.tab-pane[data-pane-id="' + tabId + '"]');
+                if (pane) pane.remove();
+                if (this.list.length === 0) {
+                    this.activeTabId = null;
+                    const tabContainer = document.getElementById('tab-container');
+                    const mainContainer = document.getElementById('main-container');
+                    if (tabContainer) { tabContainer.classList.add('hidden'); tabContainer.style.display = 'none'; }
+                    if (mainContainer) mainContainer.classList.remove('hidden');
+                    this.renderTabBar();
+                    if (typeof app.router === 'function') app.router('home');
+                    return;
+                }
+                this.renderTabBar();
+                if (wasActive) {
+                    const next = this.list[Math.min(idx, this.list.length - 1)];
+                    this.activateTab(next.id);
+                }
+            },
+
+            renderTabBar() {
+                const wrapper = document.getElementById('tab-bar-wrapper');
+                const bar = document.getElementById('tab-bar');
+                if (!bar || !wrapper) return;
+                if (this.list.length === 0) {
+                    wrapper.classList.add('hidden');
+                    bar.innerHTML = '';
+                    return;
+                }
+                wrapper.classList.remove('hidden');
+                bar.innerHTML = '';
+                const homeTab = document.createElement('div');
+                homeTab.className = 'tab-item tab-home' + (this.activeTabId === 'home' ? ' active' : '');
+                homeTab.title = '首页';
+                homeTab.innerHTML = '<i class="fa-solid fa-house"></i><span>首页</span>';
+                homeTab.onclick = (e) => { e.stopPropagation(); this.activateHomeTab(); };
+                bar.appendChild(homeTab);
+                this.list.forEach(tab => {
+                    const el = document.createElement('div');
+                    el.className = 'tab-item' + (tab.id === this.activeTabId ? ' active' : '');
+                    el.dataset.tabId = tab.id;
+                    let titleHtml = app.escapeHtml ? app.escapeHtml(tab.title) : String(tab.title);
+                    if (tab.title && tab.entryTitle && tab.title !== tab.entryTitle) {
+                        titleHtml = '<span class="tab-main-title">' + (app.escapeHtml ? app.escapeHtml(tab.entryTitle) : String(tab.entryTitle)) + '</span>' +
+                            '<span class="tab-version-title">·' + (app.escapeHtml ? app.escapeHtml(tab.title) : String(tab.title)) + '</span>';
+                    }
+                    el.innerHTML =
+                        '<span class="tab-icon"><i class="fa-solid fa-file-lines"></i></span>' +
+                        '<span class="tab-title">' + titleHtml + '</span>' +
+                        '<span class="tab-close" title="关闭标签"><i class="fa-solid fa-xmark"></i></span>';
+                    el.onclick = (e) => {
+                        if (e.target.closest('.tab-close')) return;
+                        this.activateTab(tab.id);
+                    };
+                    el.querySelector('.tab-close').onclick = (e) => {
+                        e.stopPropagation();
+                        this.closeTab(tab.id);
+                    };
+                    bar.appendChild(el);
+                });
+            }
+        },
+
+        getEntryContainer() {
+            if (this.tabsSystem && this.tabsSystem.hasActiveEntryTab()) {
+                const pane = this.tabsSystem.getActivePane();
+                if (pane) return pane;
+            }
+            return document.getElementById('main-container');
+        },
+
+        // ==================== 主题系统（与本地版同步） ====================
+        theme: {
+            mode: 'light',
+            bgColor: '',
+            textColor: '',
+            _init() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem('glight_theme') || '{}');
+                    this.mode = saved.mode || 'light';
+                    this.bgColor = saved.bgColor || '';
+                    this.textColor = saved.textColor || '';
+                } catch (e) {}
+                this.apply();
+            },
+            apply() {
+                const body = document.body;
+                if (!body) return;
+                body.classList.remove('theme-light', 'theme-dark', 'theme-custom');
+                if (this.mode === 'dark') body.classList.add('theme-dark');
+                else if (this.mode === 'custom') body.classList.add('theme-custom');
+                else body.classList.add('theme-light');
+                const root = document.documentElement;
+                if (this.mode === 'custom') {
+                    if (this.bgColor) root.style.setProperty('--app-bg', this.bgColor);
+                    if (this.textColor) root.style.setProperty('--app-text', this.textColor);
+                } else {
+                    root.style.removeProperty('--app-bg');
+                    root.style.removeProperty('--app-text');
+                }
+                try { localStorage.setItem('glight_theme', JSON.stringify({ mode: this.mode, bgColor: this.bgColor, textColor: this.textColor })); } catch (e) {}
+            }
+        },
+
+        setThemeMode(mode) {
+            this.theme.mode = mode;
+            this.theme.apply();
+        },
+
+        toggleThemeMode() {
+            const order = ['light', 'dark', 'custom'];
+            const next = order[(order.indexOf(this.theme.mode) + 1) % order.length];
+            this.setThemeMode(next);
+            if (next === 'custom') this.showThemeCustomDialog();
+            else if (this.showToast) this.showToast('主题已切换：' + (next === 'light' ? '浅色' : '深色'), 'info', 1500);
+        },
+
+        showThemeCustomDialog() {
+            // 关闭旧弹窗
+            document.querySelectorAll('.theme-modal').forEach(el => el.remove());
+            const modal = document.createElement('div');
+            modal.className = 'theme-modal';
+            modal.innerHTML = `
+                <div class="theme-modal-box">
+                    <h3 style="font-weight:700;margin-bottom:16px;">自定义主题</h3>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <label style="font-size:12px;color:#6b7280;flex:1;">背景颜色</label>
+                        <input type="color" id="theme-gh-bg" value="${this.theme.bgColor || '#f3f4f6'}">
+                        <input type="text" id="theme-gh-bg-text" placeholder="#f3f4f6" value="${this.theme.bgColor || ''}" style="width:110px;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                        <label style="font-size:12px;color:#6b7280;flex:1;">文字颜色</label>
+                        <input type="color" id="theme-gh-text" value="${this.theme.textColor || '#1f2937'}">
+                        <input type="text" id="theme-gh-text-text" placeholder="#1f2937" value="${this.theme.textColor || ''}" style="width:110px;">
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button id="theme-gh-apply" style="flex:1;padding:8px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;">应用</button>
+                        <button id="theme-gh-reset" style="flex:1;padding:8px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer;">恢复默认</button>
+                        <button id="theme-gh-close" style="flex:1;padding:8px;background:transparent;color:#6b7280;border:none;border-radius:8px;cursor:pointer;">关闭</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            const sync = () => {
+                const bg = document.getElementById('theme-gh-bg').value;
+                const bgT = document.getElementById('theme-gh-bg-text').value;
+                const tx = document.getElementById('theme-gh-text').value;
+                const txT = document.getElementById('theme-gh-text-text').value;
+                if (bgT && /^#[0-9a-fA-F]{3,8}$/.test(bgT)) document.getElementById('theme-gh-bg').value = bgT;
+                if (txT && /^#[0-9a-fA-F]{3,8}$/.test(txT)) document.getElementById('theme-gh-text').value = txT;
+            };
+            modal.querySelector('#theme-gh-bg').oninput = sync;
+            modal.querySelector('#theme-gh-text').oninput = sync;
+            modal.querySelector('#theme-gh-bg-text').onchange = sync;
+            modal.querySelector('#theme-gh-text-text').onchange = sync;
+            modal.querySelector('#theme-gh-apply').onclick = () => {
+                this.theme.bgColor = document.getElementById('theme-gh-bg').value;
+                this.theme.textColor = document.getElementById('theme-gh-text').value;
+                this.theme.apply();
+                modal.remove();
+                if (this.showToast) this.showToast('自定义主题已应用', 'success');
+            };
+            modal.querySelector('#theme-gh-reset').onclick = () => {
+                this.theme.bgColor = '';
+                this.theme.textColor = '';
+                this.setThemeMode('light');
+                modal.remove();
+            };
+            modal.querySelector('#theme-gh-close').onclick = () => modal.remove();
+        },
+
         // ==================== 初始化 ====================
         // 【性能优化】重写init，消除重复操作，统一加载完成逻辑
         async init() {
@@ -836,6 +1261,11 @@
                 setTimeout(() => { try { this.router('home'); } catch (e2) {} }, 200);
             }
             try { this.initKeyboardListeners(); } catch (e) { /* ignore */ }
+            // 【新增】初始化标签页与主题（与本地版同步）
+            try {
+                if (this.tabsSystem && typeof this.tabsSystem.init === 'function') this.tabsSystem.init();
+                if (this.theme && typeof this.theme._init === 'function') this.theme._init();
+            } catch (e) { console.warn('[Finish] tabs/theme 初始化失败:', e); }
             // 【新增】显示欢迎窗口（首次访问）
             setTimeout(() => this._checkAndShowWelcome(), 300);
             // 【新增】解析 URL hash 并跳转到对应词条
@@ -1306,6 +1736,20 @@
             }
             container.innerHTML = '';
 
+            // 【准应用】非词条视图 → 显示主容器、隐藏标签容器（标签栏在有词条标签时保留）
+            if (view !== 'detail' && this.tabsSystem) {
+                const tabContainer = document.getElementById('tab-container');
+                const tabBarWrapper = document.getElementById('tab-bar-wrapper');
+                if (tabContainer) { tabContainer.classList.add('hidden'); tabContainer.style.display = 'none'; }
+                if (tabBarWrapper && this.tabsSystem.list.length === 0) tabBarWrapper.classList.add('hidden');
+                container.classList.remove('hidden');
+                // 有词条标签时，标签栏高亮切回"首页"标签
+                if (this.tabsSystem.list.length > 0) {
+                    this.tabsSystem.activeTabId = 'home';
+                    this.tabsSystem.renderTabBar();
+                }
+            }
+
             // 【功能4】离开详情页时清除隐藏词条黑底白字状态
             if (view !== 'detail') {
                 this.data._currentHiddenEntryId = null;
@@ -1338,7 +1782,15 @@
                 case 'non-characters': this.renderSettingsGrouped(container); break;
                 case 'events': this.renderEvents(container); break;
                 case 'graph': this.renderGraph(container); break;
-                case 'detail': this.renderDetail(container); break;
+                case 'detail': {
+                    // 准应用模式：词条详情走标签页
+                    if (this.tabsSystem && typeof this.tabsSystem.ensureEntryTab === 'function') {
+                        this.tabsSystem.ensureEntryTab(this.data.editingId, this.data.viewingVersionId);
+                    } else {
+                        this.renderDetail(container);
+                    }
+                    break;
+                }
                 case 'synopsis': this.renderSynopsisView(container); break;
                 default: this.renderHome(container);
             }
@@ -2037,6 +2489,8 @@
 
         // ==================== 详情页渲染（核心修复区域） ====================
         renderDetail(container) {
+            // 【关键】清空容器，防止标签页反复切换时模板累积堆叠
+            if (container) container.innerHTML = '';
             const entry = this.data.entries.find(e => e.id === this.data.editingId);
             if (!entry) {
                 container.innerHTML = '<div class="p-4 text-red-600">你要找的东西好像消失惹~（条目不存在或已被删除）</div>';
