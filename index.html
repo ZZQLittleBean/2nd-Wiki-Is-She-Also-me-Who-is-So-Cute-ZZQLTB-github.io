@@ -1074,6 +1074,9 @@
             bgColor: '',
             textColor: '',
             PRESETS: { blue:{accent:'#4f46e5',accentDark:'#4338ca',light:'#eef2ff',lightText:'#3730a3',darkText:'#e0e7ff'}, sakura:{accent:'#ec4899',accentDark:'#db2777',light:'#fdf2f8',lightText:'#be185d',darkText:'#fbcfe8'}, brown:{accent:'#8b5e3c',accentDark:'#6b4423',light:'#f7f1ea',lightText:'#5c3a1e',darkText:'#e8d5c4'}, green:{accent:'#10b981',accentDark:'#059669',light:'#ecfdf5',lightText:'#047857',darkText:'#a7f3d0'}, purple:{accent:'#8b5cf6',accentDark:'#7c3aed',light:'#f5f3ff',lightText:'#6d28d9',darkText:'#ddd6fe'}, orange:{accent:'#f97316',accentDark:'#ea580c',light:'#fff7ed',lightText:'#c2410c',darkText:'#fed7aa'}, red:{accent:'#ef4444',accentDark:'#dc2626',light:'#fef2f2',lightText:'#b91c1c',darkText:'#fecaca'}, teal:{accent:'#14b8a6',accentDark:'#0d9488',light:'#f0fdfa',lightText:'#0f766e',darkText:'#99f6e4'} },
+            // 预设配色。键名是内部标识（与桌面版 settings.theme.preset 对应），
+            // LABELS 是给访客看的中文名 —— 界面上一律显示中文名，不暴露键名。
+            PRESET_LABELS: { blue:'靛蓝', sakura:'樱粉', brown:'棕褐', green:'翠绿', purple:'紫罗兰', orange:'暖橙', red:'赤红', teal:'青碧' },
             mixColor(hex, mixHex, ratio) {
                 try {
                     const p = (h) => { h = String(h||'').replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
@@ -1327,9 +1330,13 @@
             const curText = t.textMode || 'black-white';
             const curTone = typeof t.lightTone === 'number' ? t.lightTone : 50;
             const archive = this.theme.archiveTheme();
-            const sourceLabel = eff.source === 'local'
-                ? '已按你的本地选择显示'
-                : (eff.source === 'archive' ? '跟随存档默认（作者设置）' : '内置默认');
+            // 【文案】来源标签一律用中性产品语言，不提"存档/作者/字段"等内部说法：
+            //   local   = 访客自己改过
+            //   archive = 站点设有默认配色
+            //   builtin = 站点没设，用内置配色
+            const sourceLabel = this._themeSourceLabel();
+            const presetName = (key) => this.theme.PRESET_LABELS[key] || key;
+            const bgName = { white: '白色', light: '浅色', dark: '深色', black: '黑色' };
 
             const wrap = document.createElement('div');
             wrap.className = 'h-full overflow-y-auto p-4 fade-in';
@@ -1337,8 +1344,7 @@
                 <div class="max-w-3xl mx-auto pb-20">
                     <h2 class="text-xl font-bold text-gray-800 mb-1">设置</h2>
                     <p class="text-xs text-gray-500 mb-5">
-                        GitHub 版是只读站点，这里只列出能在此版本生效的设置。
-                        主题会与桌面版的设置保持同一套字段。
+                        本站为只读浏览。以下设置只影响你自己的浏览体验，保存在本机，不会改动站点内容。
                     </p>
 
                     <section class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
@@ -1348,14 +1354,14 @@
                         </div>
 
                         <div class="mb-4">
-                            <div class="text-xs font-bold text-gray-500 mb-2">预设色（影响重点色与深/浅文字色）</div>
+                            <div class="text-xs font-bold text-gray-500 mb-2">配色方案</div>
                             <div class="flex flex-wrap gap-2" id="gh-preset-row">
                                 ${Object.keys(presets).map(p => `
-                                    <button data-pre="${p}" title="${p}"
+                                    <button data-pre="${p}" title="${presetName(p)}"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 transition"
                                         style="border-color:${p === curPreset ? presets[p].accent : 'transparent'};background:transparent;">
                                         <span style="width:16px;height:16px;border-radius:50%;background:${presets[p].accent};display:inline-block;"></span>
-                                        <span class="text-[11px] text-gray-600">${p}</span>
+                                        <span class="text-[11px] text-gray-600">${presetName(p)}</span>
                                     </button>`).join('')}
                             </div>
                         </div>
@@ -1384,20 +1390,23 @@
                         <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100">
                             <button id="gh-theme-reset"
                                 class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition">
-                                <i class="fa-solid fa-rotate-left mr-1"></i>恢复为存档默认
+                                <i class="fa-solid fa-rotate-left mr-1"></i>恢复默认
                             </button>
-                            <span class="text-[11px] text-gray-400">
-                                ${archive.preset ? '存档默认：' + this.escapeHtml(String(archive.preset)) + ' / ' + this.escapeHtml(String(archive.bgMode || '-')) : '存档未设置主题，当前为内置默认'}
+                            <span class="text-[11px] text-gray-400" id="gh-theme-default-note">
+                                ${archive.preset
+                                    ? '本站默认配色：' + presetName(String(archive.preset)) +
+                                      (archive.bgMode ? ' · ' + (bgName[String(archive.bgMode)] || String(archive.bgMode)) + '背景' : '')
+                                    : '本站未单独设置默认配色，当前使用内置配色'}
                             </span>
                         </div>
                     </section>
 
                     <section class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                        <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-circle-info mr-2 text-indigo-500"></i>关于本页</h3>
+                        <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-circle-info mr-2 text-indigo-500"></i>说明</h3>
                         <ul class="text-xs text-gray-600 space-y-1.5 leading-relaxed">
-                            <li>· 你的主题选择保存在<strong>本机浏览器</strong>里，不会修改存档，也不影响其他访客。</li>
-                            <li>· 存档里由作者设定的主题是默认值；你改过之后以你的为准，点"恢复为存档默认"即可回到作者那套。</li>
-                            <li>· 桌面版专属设置（阵营管理、存档管理、图片裁剪、AI 助手等）不在此页，它们只在本地客户端生效。</li>
+                            <li>· 主题选择保存在<strong>本机浏览器</strong>，刷新后仍然有效，也不会影响其他访客。</li>
+                            <li>· 想回到本站默认配色，点「恢复默认」即可。</li>
+                            <li>· 本站为只读浏览。如需编辑或管理内容，请使用桌面客户端。</li>
                         </ul>
                     </section>
                 </div>`;
@@ -1410,7 +1419,7 @@
                     this.setThemePreset(b.dataset.pre);
                     this._refreshSettingsMarks(wrap);
                     const el = wrap.querySelector('#gh-theme-source');
-                    if (el) el.textContent = this.theme.effectiveTheme().source === 'local' ? '已按你的本地选择显示' : '跟随存档默认（作者设置）';
+                    if (el) el.textContent = this._themeSourceLabel();
                 };
             });
             wrap.querySelectorAll('[data-bg]').forEach(b => {
@@ -1425,8 +1434,19 @@
             if (reset) reset.onclick = () => {
                 this.theme.clearOverride();
                 this.router('settings');
-                if (this.showToast) this.showToast('已恢复为存档默认主题', 'success', 1500);
+                if (this.showToast) this.showToast('已恢复默认配色', 'success', 1500);
             };
+        },
+
+        /**
+         * 主题来源标签（唯一出处，避免多处文案不一致）。
+         * 一律中性产品语言 —— 面向访客，不出现"存档/作者/字段"这类内部说法。
+         */
+        _themeSourceLabel() {
+            const source = this.theme.effectiveTheme().source;
+            if (source === 'local') return '已应用你的选择';
+            if (source === 'archive') return '本站默认';
+            return '内置默认';
         },
 
         /** 只更新选中态样式，不重绘整页（避免滑杆被打断）。 */
@@ -1874,12 +1894,12 @@
                 return { valid: false, error: '数据不是有效的JSON对象' };
             }
             if (!data.entries || !Array.isArray(data.entries)) {
-                return { valid: false, error: '缺少 entries 数组。请确认这是通过本地版 Wiki 导出的正确数据文件。' };
+                return { valid: false, error: '数据文件缺少 entries 数组，无法读取。站点管理员请确认上传的是导出后的完整数据包。' };
             }
             if (data.entries.length > 0) {
                 const first = data.entries[0];
                 if (!first.id || !first.type || !first.versions) {
-                    return { valid: false, error: 'entries 数组中的条目格式不正确。缺少 id、type 或 versions 字段。' };
+                    return { valid: false, error: '数据文件中的词条格式不正确（缺少必要字段），无法读取。' };
                 }
             }
             return { valid: true };
@@ -2130,7 +2150,7 @@
             const titleEl = clone.getElementById('empty-title');
             const descEl = clone.getElementById('empty-desc');
             if (titleEl) titleEl.textContent = title || '暂无数据';
-            if (descEl) descEl.textContent = desc || '管理员尚未添加内容，请检查存档文件是否正确放置。';
+            if (descEl) descEl.textContent = desc || '内容尚未添加。站点管理员请确认数据文件已正确上传。';
             container.appendChild(clone);
         },
 
@@ -2488,7 +2508,7 @@
         // ==================== 列表渲染 ====================
         renderList(container, type) {
             if (this.isDataEmpty()) {
-                this.showEmptyState(container, '暂无角色数据', '管理员尚未添加角色，请检查存档文件。');
+                this.showEmptyState(container, '暂无角色数据', '角色尚未添加。站点管理员请确认数据文件已正确上传。');
                 return;
             }
             const tpl = document.getElementById('tpl-list');
@@ -2622,7 +2642,7 @@
         // ==================== 设定分类渲染 ====================
         renderSettingsGrouped(container) {
             if (this.isDataEmpty()) {
-                this.showEmptyState(container, '暂无设定数据', '管理员尚未添加设定，请检查存档文件。');
+                this.showEmptyState(container, '暂无设定数据', '设定尚未添加。站点管理员请确认数据文件已正确上传。');
                 return;
             }
             const tpl = document.getElementById('tpl-list');
@@ -4110,7 +4130,7 @@
         // ==================== 剧情梗概浏览 ====================
         renderSynopsisView(container) {
             if (!this.data.synopsis || this.data.synopsis.length === 0) {
-                this.showEmptyState(container, '暂无剧情梗概', '管理员尚未添加剧情梗概，请检查存档文件。');
+                this.showEmptyState(container, '暂无剧情梗概', '剧情梗概尚未添加。站点管理员请确认数据文件已正确上传。');
                 return;
             }
             const tpl = document.getElementById('tpl-synopsis');
@@ -4943,8 +4963,8 @@
     </button>
     <script>
         app.showCloudyWebHint = function() {
-            if (typeof app.showToast === 'function') app.showToast('该功能仅在程序端可用，请体验程序端', 'info', 3000);
-            else alert('该功能仅在程序端可用，请体验程序端');
+            if (typeof app.showToast === 'function') app.showToast('云云酱正在准备中，敬请期待', 'info', 3000);
+            else alert('云云酱正在准备中，敬请期待');
         };
     </script>
 
