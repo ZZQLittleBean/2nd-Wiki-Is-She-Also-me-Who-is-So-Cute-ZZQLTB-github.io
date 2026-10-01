@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +9,7 @@
     <meta http-equiv="Expires" content="0">
     <title>「Glight」-微光维基-github-v2.7</title>
     <!-- 构建时间戳，用于确认版本 -->
-    <meta name="wiki-build" content="v2-fix4">
+    <meta name="wiki-build" content="v2-fix7-gh-settings">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -217,6 +217,9 @@
             --app-accent: #4f46e5;
         }
         body { background-color: var(--app-bg); color: var(--app-text); }
+        /* body 自身带 text-gray-800 类，Tailwind .text-gray-800 特异性压过 body{color:var(--app-text)}，
+           需 !important 覆盖，否则深色/自定义主题下 body 文字仍是深灰（历史 bug，与本地版同源） */
+        body.theme-dark, body.theme-custom { color: var(--app-text) !important; }
         body.theme-dark {
             --app-bg: #10151f;
             --app-text: #e2e8f0;
@@ -253,6 +256,38 @@
         body.theme-custom .border-gray-200 { border-color: var(--app-border) !important; }
         body.theme-dark header,
         body.theme-custom header { background-color: var(--app-card) !important; }
+
+        /* ===== 重点色联动：data-accent 时 indigo 元素改用预设重点色（与本地版同步） ===== */
+        body[data-accent] .bg-white { background-color: var(--app-card) !important; }
+        body[data-accent] .bg-gray-50 { background-color: color-mix(in srgb, var(--app-card) 82%, transparent) !important; }
+        body[data-accent] .bg-gray-100 { background-color: color-mix(in srgb, var(--app-card) 90%, transparent) !important; }
+        body[data-accent] { color: var(--app-text) !important; }
+        body[data-accent] .text-gray-900,
+        body[data-accent] .text-gray-800 { color: var(--app-text) !important; }
+        body[data-accent] .text-gray-700,
+        body[data-accent] .text-gray-600,
+        body[data-accent] .text-gray-500,
+        body[data-accent] .text-gray-400 { color: var(--app-muted) !important; }
+        body[data-accent] .border-gray-100,
+        body[data-accent] .border-gray-200,
+        body[data-accent] .border-gray-300 { border-color: var(--app-border) !important; }
+        body[data-accent] header { background-color: var(--app-card) !important; }
+        body[data-accent] .text-indigo-600,
+        body[data-accent] .text-indigo-500,
+        body[data-accent] .text-indigo-700,
+        body[data-accent] .text-indigo-800 { color: var(--app-accent) !important; }
+        body[data-accent] .bg-indigo-600,
+        body[data-accent] .bg-indigo-700 { background-color: var(--app-accent) !important; }
+        body[data-accent] .bg-indigo-50,
+        body[data-accent] .bg-indigo-100,
+        body[data-accent] .bg-indigo-200 { background-color: var(--app-accent-light, color-mix(in srgb, var(--app-accent) 12%, var(--app-card))) !important; }
+        body[data-accent] .border-indigo-200,
+        body[data-accent] .border-indigo-300,
+        body[data-accent] .border-indigo-400,
+        body[data-accent] .border-indigo-500,
+        body[data-accent] .border-indigo-600 { border-color: var(--app-accent) !important; }
+        body[data-accent] .focus\:ring-indigo-500:focus,
+        body[data-accent] .focus\:ring-indigo-400:focus { --tw-ring-color: var(--app-accent) !important; }
 
         /* ========== 标签页（浏览器式，与本地版同步） ========== */
         #tab-bar { scrollbar-width: thin; }
@@ -354,7 +389,7 @@
                 <i class="fa-solid fa-search absolute left-3 top-2 text-gray-400 text-xs"></i>
                 <div id="search-dropdown" class="search-dropdown hidden"></div>
             </div>
-            <button class="app-tool-btn" title="切换主题（浅色/深色/自定义）" onclick="app.toggleThemeMode()">
+            <button class="app-tool-btn" title="切换主题" onclick="app.showThemeFullPanel()">
                 <i class="fa-solid fa-palette"></i>
             </button>
         </div>
@@ -396,6 +431,10 @@
             </button>
             <button onclick="app.router('synopsis')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="synopsis">
                 <i class="fa-solid fa-film text-lg"></i><span class="text-[10px]">剧情</span>
+            </button>
+            <!-- 【新增】设置页：只放 GitHub 版可用的设置（主题等）。桌面版专属设置不在此列。 -->
+            <button onclick="app.router('settings')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-indigo-600 w-full py-1" data-target="settings">
+                <i class="fa-solid fa-gear text-lg"></i><span class="text-[10px]">设置</span>
             </button>
             <a href="https://github.com/ZZQLittleBean/2nd-Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB-github.io" target="_blank" rel="noopener noreferrer" class="nav-btn flex flex-col items-center gap-0.5 text-gray-500 hover:text-gray-900 w-full py-1">
                 <i class="fa-brands fa-github text-lg"></i><span class="text-[10px]">GitHub</span>
@@ -930,6 +969,9 @@
                 this.renderTabBar();
                 if (typeof app.updateUI === 'function') app.updateUI();
                 try {
+                    // 【关键修复】详情标签必须同步 editingId，否则点击标签时 editingId 残留上一个词条，
+                    // renderDetail 会渲染错误词条并触发残留隐藏词条的密码弹窗
+                    app.data.editingId = tab.entryId;
                     app.data.viewingVersionId = tab.versionId || app.data.viewingVersionId;
                     if (typeof app.renderDetail === 'function') app.renderDetail(pane);
                     else pane.innerHTML = '<div class="p-8 text-center text-gray-400">详情模块未加载</div>';
@@ -1031,6 +1073,65 @@
             mode: 'light',
             bgColor: '',
             textColor: '',
+            PRESETS: { blue:{accent:'#4f46e5',accentDark:'#4338ca',light:'#eef2ff',lightText:'#3730a3',darkText:'#e0e7ff'}, sakura:{accent:'#ec4899',accentDark:'#db2777',light:'#fdf2f8',lightText:'#be185d',darkText:'#fbcfe8'}, brown:{accent:'#8b5e3c',accentDark:'#6b4423',light:'#f7f1ea',lightText:'#5c3a1e',darkText:'#e8d5c4'}, green:{accent:'#10b981',accentDark:'#059669',light:'#ecfdf5',lightText:'#047857',darkText:'#a7f3d0'}, purple:{accent:'#8b5cf6',accentDark:'#7c3aed',light:'#f5f3ff',lightText:'#6d28d9',darkText:'#ddd6fe'}, orange:{accent:'#f97316',accentDark:'#ea580c',light:'#fff7ed',lightText:'#c2410c',darkText:'#fed7aa'}, red:{accent:'#ef4444',accentDark:'#dc2626',light:'#fef2f2',lightText:'#b91c1c',darkText:'#fecaca'}, teal:{accent:'#14b8a6',accentDark:'#0d9488',light:'#f0fdfa',lightText:'#0f766e',darkText:'#99f6e4'} },
+            mixColor(hex, mixHex, ratio) {
+                try {
+                    const p = (h) => { h = String(h||'').replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
+                    const a=p(hex), b=p(mixHex);
+                    const r=Math.round(a[0]*(1-ratio)+b[0]*ratio), g=Math.round(a[1]*(1-ratio)+b[1]*ratio), bl=Math.round(a[2]*(1-ratio)+b[2]*ratio);
+                    return '#'+[r,g,bl].map(v=>v.toString(16).padStart(2,'0')).join('');
+                } catch(e){ return hex; }
+            },
+            // ===== 【新增】访客本地主题覆盖 =====
+            // GitHub 版是**只读**的（访客无法写 data.json），因此访客自己调的主题
+            // 必须存在 localStorage 里。优先级：
+            //    内置默认  <  存档 settings.theme（作者的默认，与桌面版同步）  <  访客本地覆盖
+            // 这样作者在桌面版调好主题并发布后，访客默认看到的就是那套；
+            // 而访客自己改过之后，刷新仍然保留自己的选择，且不会影响别人。
+            OVERRIDE_KEY: 'glight_theme_override',
+            readOverride() {
+                try {
+                    const raw = localStorage.getItem(this.OVERRIDE_KEY);
+                    if (!raw) return null;
+                    const o = JSON.parse(raw);
+                    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : null;
+                } catch (e) { return null; }
+            },
+            writeOverride(o) {
+                try {
+                    if (o === null) localStorage.removeItem(this.OVERRIDE_KEY);
+                    else localStorage.setItem(this.OVERRIDE_KEY, JSON.stringify(o));
+                } catch (e) {}
+            },
+            /** 存档里的主题默认值（桌面版发布时写入的那份）。 */
+            archiveTheme() {
+                return (app.data && app.data.settings && app.data.settings.theme) || {};
+            },
+            /** 当前**生效**的主题 = 存档默认 ← 访客覆盖。 */
+            effectiveTheme() {
+                const base = this.archiveTheme();
+                const override = this.readOverride();
+                const merged = override ? Object.assign({}, base, override) : base;
+                // 来源标签：给设置页显示"当前跟随谁"
+                let source = 'builtin';
+                if (base.preset || base.bgMode) source = 'archive';
+                if (override) source = 'local';
+                return { value: merged, source: source };
+            },
+            /** 把当前设置页里的值写进本地覆盖。 */
+            persistOverride(patch) {
+                const cur = this.readOverride() || {};
+                const next = Object.assign({}, cur, patch);
+                // 与存档默认完全一致时不留覆盖，避免"看起来改过"其实没改
+                const base = this.archiveTheme();
+                const same = Object.keys(next).every(k => next[k] === base[k]);
+                this.writeOverride(same ? null : next);
+            },
+            /** 清除本地覆盖，回到存档默认。 */
+            clearOverride() {
+                this.writeOverride(null);
+                this.apply();
+            },
             _init() {
                 try {
                     const saved = JSON.parse(localStorage.getItem('glight_theme') || '{}');
@@ -1048,6 +1149,29 @@
                 else if (this.mode === 'custom') body.classList.add('theme-custom');
                 else body.classList.add('theme-light');
                 const root = document.documentElement;
+                // 【主题同步】优先读取本地版写入的共享主题配置（preset/bgMode/textMode/lightTone）
+                // 【新增】再叠加访客的本地覆盖（只读站点无法写 data.json）
+                const t = this.effectiveTheme().value;
+                if (t.preset && this.PRESETS[t.preset] && t.bgMode) {
+                    const p = this.PRESETS[t.preset];
+                    const isDark = (t.bgMode === 'dark' || t.bgMode === 'black');
+                    const tone = typeof t.lightTone === 'number' ? t.lightTone / 100 : 0.5;
+                    let bg, card, border, text, muted;
+                    if (t.bgMode === 'white') { bg = '#ffffff'; card = '#ffffff'; border = '#e5e7eb'; }
+                    else if (t.bgMode === 'light') { bg = this.mixColor('#ffffff', p.accent, 0.06 + tone * 0.14); card = this.mixColor(bg, '#ffffff', 0.62); border = this.mixColor(bg, '#000000', 0.06 + tone * 0.06); }
+                    else if (t.bgMode === 'dark') { bg = this.mixColor('#18212f', p.accent, 0.18); card = this.mixColor(bg, '#ffffff', 0.10); border = this.mixColor(bg, '#ffffff', 0.18); }
+                    else { bg = '#18212f'; card = this.mixColor('#18212f', '#ffffff', 0.07); border = this.mixColor('#18212f', '#ffffff', 0.14); }
+                    if (t.textMode === 'deep-light') { text = isDark ? p.darkText : p.lightText; muted = this.mixColor(text, '#ffffff', 0.35); }
+                    else { text = isDark ? '#f5f5f5' : '#1a1a1a'; muted = isDark ? '#9ca3af' : '#6b7280'; }
+                    root.style.setProperty('--app-bg', bg);
+                    root.style.setProperty('--app-card', card);
+                    root.style.setProperty('--app-border', border);
+                    root.style.setProperty('--app-text', text);
+                    root.style.setProperty('--app-muted', muted);
+                    root.style.setProperty('--app-accent', p.accent);
+                    body.setAttribute('data-accent', t.preset);
+                    return;
+                }
                 if (this.mode === 'custom') {
                     if (this.bgColor) root.style.setProperty('--app-bg', this.bgColor);
                     if (this.textColor) root.style.setProperty('--app-text', this.textColor);
@@ -1126,10 +1250,207 @@
             modal.querySelector('#theme-gh-close').onclick = () => modal.remove();
         },
 
+        // ==================== 主题完整面板（与本地版同步：预设色/背景/文字/浅色调） ====================
+        // 【改造】这四个 setter 只写**本地覆盖**，不再改 app.data。
+        // 原因：GitHub 版是只读视图，改 app.data 既存不下来、又会让"本地覆盖 == 存档默认"
+        // 而导致覆盖被当成无变化清掉。现在 app.data 永远等于存档内容，访客选择独立存放。
+        setThemePreset(preset) {
+            if (!this.theme.PRESETS[preset]) return;
+            this.theme.persistOverride({ preset: preset });
+            this.theme.apply();
+        },
+        setThemeBgMode(mode) {
+            this.theme.persistOverride({ bgMode: mode });
+            this.theme.apply();
+        },
+        setThemeTextMode(mode) {
+            this.theme.persistOverride({ textMode: mode });
+            this.theme.apply();
+        },
+        setThemeLightTone(val) {
+            const tone = Math.max(5, Math.min(95, parseInt(val) || 50));
+            this.theme.persistOverride({ lightTone: tone });
+            this.theme.apply();
+            const label = document.getElementById('gh-light-tone-val');
+            if (label) label.textContent = String(tone);
+        },
+        showThemeFullPanel() {
+            document.querySelectorAll('.theme-modal').forEach(el => el.remove());
+            const t = this.theme.effectiveTheme().value;
+            const presets = this.theme.PRESETS;
+            const curPreset = t.preset || 'blue';
+            const curBg = t.bgMode || (this.theme.mode === 'dark' ? 'dark' : 'white');
+            const curText = t.textMode || 'black-white';
+            const curTone = typeof t.lightTone === 'number' ? t.lightTone : 50;
+            const presetButtons = Object.keys(presets).map(p => `<button data-pre="${p}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:10px;border:2px solid ${p === curPreset ? presets[p].accent : 'transparent'};cursor:pointer;background:transparent;"><span style="width:16px;height:16px;border-radius:50%;background:${presets[p].accent};"></span><span style="font-size:11px;">${p}</span></button>`).join('');
+            const modal = document.createElement('div');
+            modal.className = 'theme-modal';
+            modal.innerHTML = `
+                <div class="theme-modal-box" style="max-width:360px;">
+                    <h3 style="font-weight:700;margin-bottom:14px;">主题设置</h3>
+                    <div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px;">预设色（影响重点色与深/浅文字色）</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${presetButtons}</div></div>
+                    <div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px;">背景</div><div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button data-bg="white" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;cursor:pointer;${curBg==='white'?'background:#4f46e5;color:#fff;':''}">白色</button>
+                        <button data-bg="light" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;cursor:pointer;${curBg==='light'?'background:#4f46e5;color:#fff;':''}">浅色</button>
+                        <button data-bg="dark" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;cursor:pointer;${curBg==='dark'?'background:#4f46e5;color:#fff;':''}">深色</button>
+                        <button data-bg="black" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;cursor:pointer;${curBg==='black'?'background:#4f46e5;color:#fff;':''}">黑色</button>
+                    </div></div>
+                    <div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px;">文字颜色</div><div style="display:flex;gap:6px;">
+                        <button data-tm="black-white" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;cursor:pointer;${curText==='black-white'?'background:#4f46e5;color:#fff;':''}">黑色+白色</button>
+                        <button data-tm="deep-light" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;cursor:pointer;${curText==='deep-light'?'background:#4f46e5;color:#fff;':''}">深色+浅色</button>
+                    </div></div>
+                    <div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px;">浅色深浅 <span id="gh-light-tone-val" style="font-weight:400;">${curTone}</span></div><input type="range" id="gh-light-tone" min="5" max="95" value="${curTone}" style="width:100%;"></div>
+                    <div style="display:flex;gap:8px;"><button id="theme-gh-close" style="flex:1;padding:8px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;">完成</button></div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            modal.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => { this.setThemePreset(b.dataset.pre); });
+            modal.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => { this.setThemeBgMode(b.dataset.bg); });
+            modal.querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { this.setThemeTextMode(b.dataset.tm); });
+            modal.querySelector('#gh-light-tone').oninput = (e) => this.setThemeLightTone(e.target.value);
+            modal.querySelector('#theme-gh-close').onclick = () => modal.remove();
+        },
+
+        // ==================== 【新增】设置页（只放 GitHub 版可用设置） ====================
+        // 设计原则：
+        //  · 这里**只**放只读站点上真正能生效的设置 —— 桌面版的阵营管理、存档管理、
+        //    图片裁剪、AI 助手等一律不进来，避免出现"点了没用"的假控件。
+        //  · 访客的选择存 localStorage，不改存档；存档里的主题是作者的默认值。
+        //  · 主题控件与桌面版的 settings.theme 字段一一对应（preset / bgMode /
+        //    textMode / lightTone），因此作者在桌面版调好再发布，访客默认即所见。
+        renderSettingsPage(container) {
+            const presets = this.theme.PRESETS;
+            const eff = this.theme.effectiveTheme();
+            const t = eff.value;
+            const curPreset = t.preset || 'blue';
+            const curBg = t.bgMode || 'white';
+            const curText = t.textMode || 'black-white';
+            const curTone = typeof t.lightTone === 'number' ? t.lightTone : 50;
+            const archive = this.theme.archiveTheme();
+            const sourceLabel = eff.source === 'local'
+                ? '已按你的本地选择显示'
+                : (eff.source === 'archive' ? '跟随存档默认（作者设置）' : '内置默认');
+
+            const wrap = document.createElement('div');
+            wrap.className = 'h-full overflow-y-auto p-4 fade-in';
+            wrap.innerHTML = `
+                <div class="max-w-3xl mx-auto pb-20">
+                    <h2 class="text-xl font-bold text-gray-800 mb-1">设置</h2>
+                    <p class="text-xs text-gray-500 mb-5">
+                        GitHub 版是只读站点，这里只列出能在此版本生效的设置。
+                        主题会与桌面版的设置保持同一套字段。
+                    </p>
+
+                    <section class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-bold text-gray-700"><i class="fa-solid fa-palette mr-2 text-indigo-500"></i>主题</h3>
+                            <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600" id="gh-theme-source">${this.escapeHtml(sourceLabel)}</span>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="text-xs font-bold text-gray-500 mb-2">预设色（影响重点色与深/浅文字色）</div>
+                            <div class="flex flex-wrap gap-2" id="gh-preset-row">
+                                ${Object.keys(presets).map(p => `
+                                    <button data-pre="${p}" title="${p}"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 transition"
+                                        style="border-color:${p === curPreset ? presets[p].accent : 'transparent'};background:transparent;">
+                                        <span style="width:16px;height:16px;border-radius:50%;background:${presets[p].accent};display:inline-block;"></span>
+                                        <span class="text-[11px] text-gray-600">${p}</span>
+                                    </button>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="text-xs font-bold text-gray-500 mb-2">背景</div>
+                            <div class="flex flex-wrap gap-2" id="gh-bg-row">
+                                ${[['white','白色'],['light','浅色'],['dark','深色'],['black','黑色']].map(([v,label]) => `
+                                    <button data-bg="${v}" class="px-3 py-1.5 rounded-lg border text-xs transition ${curBg === v ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold' : 'border-gray-200 text-gray-600'}">${label}</button>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="text-xs font-bold text-gray-500 mb-2">文字颜色</div>
+                            <div class="flex flex-wrap gap-2" id="gh-tm-row">
+                                ${[['black-white','黑色 + 白色'],['deep-light','深色 + 浅色']].map(([v,label]) => `
+                                    <button data-tm="${v}" class="px-3 py-1.5 rounded-lg border text-xs transition ${curText === v ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold' : 'border-gray-200 text-gray-600'}">${label}</button>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="text-xs font-bold text-gray-500 mb-2">浅色深浅 <span id="gh-light-tone-val" class="font-normal">${curTone}</span></div>
+                            <input type="range" id="gh-light-tone" min="5" max="95" value="${curTone}" class="w-full">
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100">
+                            <button id="gh-theme-reset"
+                                class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition">
+                                <i class="fa-solid fa-rotate-left mr-1"></i>恢复为存档默认
+                            </button>
+                            <span class="text-[11px] text-gray-400">
+                                ${archive.preset ? '存档默认：' + this.escapeHtml(String(archive.preset)) + ' / ' + this.escapeHtml(String(archive.bgMode || '-')) : '存档未设置主题，当前为内置默认'}
+                            </span>
+                        </div>
+                    </section>
+
+                    <section class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-circle-info mr-2 text-indigo-500"></i>关于本页</h3>
+                        <ul class="text-xs text-gray-600 space-y-1.5 leading-relaxed">
+                            <li>· 你的主题选择保存在<strong>本机浏览器</strong>里，不会修改存档，也不影响其他访客。</li>
+                            <li>· 存档里由作者设定的主题是默认值；你改过之后以你的为准，点"恢复为存档默认"即可回到作者那套。</li>
+                            <li>· 桌面版专属设置（阵营管理、存档管理、图片裁剪、AI 助手等）不在此页，它们只在本地客户端生效。</li>
+                        </ul>
+                    </section>
+                </div>`;
+
+            container.appendChild(wrap);
+
+            // ---- 事件绑定 --------------------------------------------------
+            wrap.querySelectorAll('[data-pre]').forEach(b => {
+                b.onclick = () => {
+                    this.setThemePreset(b.dataset.pre);
+                    this._refreshSettingsMarks(wrap);
+                    const el = wrap.querySelector('#gh-theme-source');
+                    if (el) el.textContent = this.theme.effectiveTheme().source === 'local' ? '已按你的本地选择显示' : '跟随存档默认（作者设置）';
+                };
+            });
+            wrap.querySelectorAll('[data-bg]').forEach(b => {
+                b.onclick = () => { this.setThemeBgMode(b.dataset.bg); this._refreshSettingsMarks(wrap); };
+            });
+            wrap.querySelectorAll('[data-tm]').forEach(b => {
+                b.onclick = () => { this.setThemeTextMode(b.dataset.tm); this._refreshSettingsMarks(wrap); };
+            });
+            const tone = wrap.querySelector('#gh-light-tone');
+            if (tone) tone.oninput = (e) => this.setThemeLightTone(e.target.value);
+            const reset = wrap.querySelector('#gh-theme-reset');
+            if (reset) reset.onclick = () => {
+                this.theme.clearOverride();
+                this.router('settings');
+                if (this.showToast) this.showToast('已恢复为存档默认主题', 'success', 1500);
+            };
+        },
+
+        /** 只更新选中态样式，不重绘整页（避免滑杆被打断）。 */
+        _refreshSettingsMarks(wrap) {
+            const presets = this.theme.PRESETS;
+            const t = this.theme.effectiveTheme().value;
+            wrap.querySelectorAll('[data-pre]').forEach(b => {
+                b.style.borderColor = (b.dataset.pre === (t.preset || 'blue')) ? presets[b.dataset.pre].accent : 'transparent';
+            });
+            const mark = (sel, attr, cur) => {
+                wrap.querySelectorAll(sel).forEach(b => {
+                    const on = b.dataset[attr] === cur;
+                    b.className = 'px-3 py-1.5 rounded-lg border text-xs transition ' +
+                        (on ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold' : 'border-gray-200 text-gray-600');
+                });
+            };
+            mark('[data-bg]', 'bg', t.bgMode || 'white');
+            mark('[data-tm]', 'tm', t.textMode || 'black-white');
+        },
+
         // ==================== 初始化 ====================
         // 【性能优化】重写init，消除重复操作，统一加载完成逻辑
         async init() {
-            window.__WIKI_VERSION__ = 'v2-fix6-opt';
+            window.__WIKI_VERSION__ = 'v2-fix7-gh-settings';
             console.log('[Wiki] 版本:', window.__WIKI_VERSION__);
             console.log('[Wiki] 页面URL:', window.location.href);
 
@@ -1792,6 +2113,8 @@
                     break;
                 }
                 case 'synopsis': this.renderSynopsisView(container); break;
+                // 【新增】设置页（只放 GitHub 版可用设置）
+                case 'settings': this.renderSettingsPage(container); break;
                 default: this.renderHome(container);
             }
         },
@@ -3231,6 +3554,68 @@
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
         },
 
+        // ============ 外源直链模式（正文词条跳转外部链接） ============
+        _sourceLinkHas(entry) { return !!(entry && entry.type === 'body' && entry.sourceLink); },
+        _sourceLinkSkip(entry) {
+            const s = this.data.settings || {};
+            const dismissed = s.sourceLinkDismiss && s.sourceLinkDismiss[entry.id];
+            const reset = s.sourceLinkResetAt || 0;
+            return !!(dismissed && (reset <= 0 || dismissed > reset));
+        },
+        _sourceLinkJump(entry) {
+            const url = entry.sourceLink;
+            if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener');
+        },
+        _sourceLinkNeedRedWarn(entry) {
+            const s = this.data.settings || {};
+            const dismissed = s.sourceLinkDismiss && s.sourceLinkDismiss[entry.id];
+            const reset = s.sourceLinkResetAt || 0;
+            if (!reset) return false;
+            if (!dismissed || reset > dismissed) {
+                const key = 'slwarn_' + entry.id;
+                const n = parseInt(sessionStorage.getItem(key) || '0', 10);
+                if (n < 3) { sessionStorage.setItem(key, String(n + 1)); return true; }
+            }
+            return false;
+        },
+        _sourceLinkConfirm(entry, opts, onProceed) {
+            const canSkip = opts && opts.canSkip;
+            const needRed = this._sourceLinkNeedRedWarn(entry);
+            const linkName = entry.sourceLinkName || entry.sourceLink || '外源链接';
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 fade-in';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                    <div class="text-center mb-5">
+                        <div class="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-arrow-up-right-from-square text-pink-600 text-2xl"></i></div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">外源链接确认</h3>
+                        <p class="text-gray-600 text-sm">正在前往 <span class="font-bold text-indigo-600">${this.escapeHtml(linkName)}</span>，该词条正文存储在外部链接。</p>
+                        ${needRed ? '<div class="mt-3 text-red-600 text-sm font-medium leading-snug"><i class="fa-solid fa-circle-exclamation mr-1"></i>Wiki管理员近期可能修改了外源直链的参数，需要用户进行重新确认。</div>' : ''}
+                    </div>
+                    ${canSkip ? '<label class="flex items-center gap-2 mb-4 text-sm text-gray-600"><input type="checkbox" id="sl-skip" class="rounded text-indigo-600"> 今后不再提醒</label>' : ''}
+                    <div class="flex gap-3">
+                        <button id="sl-cancel" class="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">取消</button>
+                        <button id="sl-confirm" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium shadow-lg shadow-indigo-200">前往</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#sl-cancel').onclick = () => overlay.remove();
+            overlay.querySelector('#sl-confirm').onclick = () => {
+                if (canSkip) {
+                    const chk = overlay.querySelector('#sl-skip');
+                    if (chk && chk.checked) {
+                        if (!this.data.settings.sourceLinkDismiss) this.data.settings.sourceLinkDismiss = {};
+                        this.data.settings.sourceLinkDismiss[entry.id] = Date.now();
+                        sessionStorage.removeItem('slwarn_' + entry.id);
+                        if (typeof this.saveData === 'function') this.saveData();
+                    }
+                }
+                overlay.remove();
+                if (onProceed) onProceed();
+            };
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        },
+
         showMissingConfirmDialog(entry, missingInfo) {
             const overlay = document.createElement('div');
             overlay.className = 'fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 fade-in';
@@ -3282,6 +3667,13 @@
         openEntry(entryId, versionId) {
             const entry = this.data.entries.find(e => e.id === entryId);
             if (!entry) return;
+
+            // 【外源直链模式】正文词条跳转外链二次确认（GitHub 只读版）
+            if (this._sourceLinkHas(entry)) {
+                if (this._sourceLinkSkip(entry)) { this._sourceLinkJump(entry); return; }
+                this._sourceLinkConfirm(entry, { canSkip: true }, () => this._sourceLinkJump(entry));
+                return;
+            }
 
             // 【功能4】检查隐藏目录密码（GitHub只读版，每个词条独立）
             const hiddenCfg = this.data.settings?.hiddenCategory;
@@ -4544,6 +4936,17 @@
             </div>
         </div>
     </div>
+
+    <!-- 云云酱悬浮图标（网页端仅提示程序端可用） -->
+    <button id="cloudy-web-avatar" class="fixed bottom-4 right-4 z-[9998] w-[64px] h-[86px] cursor-pointer border-none bg-transparent shadow-none transition-transform hover:scale-105" style="padding:0;" onclick="app.showCloudyWebHint()" title="云云酱">
+        <img src="assistant.png" alt="云云酱" class="w-full h-full object-contain pointer-events-none">
+    </button>
+    <script>
+        app.showCloudyWebHint = function() {
+            if (typeof app.showToast === 'function') app.showToast('该功能仅在程序端可用，请体验程序端', 'info', 3000);
+            else alert('该功能仅在程序端可用，请体验程序端');
+        };
+    </script>
 
 </body>
 </html>
