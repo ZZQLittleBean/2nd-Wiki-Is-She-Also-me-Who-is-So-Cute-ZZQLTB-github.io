@@ -1,0 +1,22 @@
+# 统一样式：避免跨平台/编辑器造成整文件变更
+# 新前端的存档导出固定为 LF + UTF-8 无 BOM，这里与之一致
+* text=auto eol=lf
+
+# 二进制资源不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff2 binary
+*.woff binary
+*.ttf binary
+*.otf binary
+
+# 数据与网页强制 LF
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.md text eol=lf
