@@ -152,25 +152,31 @@
       try {
         const cfg = await aiConfig();
         /*
-         * 旧版助手自带一套「灵感 / 华点 / 建议写入 / 表情符号」的系统提示，
-         * 那是 QQ 机器人的口径，不是云云酱。这里**替换**掉：
-         *  · 丢弃旧版所有 system 消息（含 marker 的一律不保留）
-         *  · 用站点配置里的 persona + style + binding 作为唯一 system
+         * 沿用**旧版助手自己的系统提示**（云云酱 + Wiki 结构 + 灵感/华点/建议写入），
+         * 只在其后追加两段：人格绑定（有绑定时）与检索约束。
+         * 这是按用户要求"以旧版配置为基准，叠加绑定与检索"。
          */
         const incoming = Array.isArray(messages) ? messages : [];
-        const dialogue = incoming.filter((m) => m && m.role !== 'system');
-        const personaParts = [cfg.persona, cfg.style, cfg.binding].filter(
+        const appended = [cfg.binding, cfg.retrieval].filter(
           (part) => typeof part === 'string' && part.trim() !== '',
         );
-        const system = personaParts.join('\n\n');
-        const merged = system === '' ? dialogue : [{ role: 'system', content: system }, ...dialogue];
+        const suffix = appended.join('\n\n');
 
-        /* 留一份请求体给自检脚本看（不含 key 明文） */
+        const merged = incoming.map((m) => ({ ...m }));
+        if (suffix !== '') {
+          const sysIndex = merged.findIndex((m) => m && m.role === 'system');
+          if (sysIndex >= 0) {
+            merged[sysIndex] = { role: 'system', content: `${merged[sysIndex].content}\n\n${suffix}` };
+          } else {
+            merged.unshift({ role: 'system', content: suffix });
+          }
+        }
+
         window.__siteLastRequest = {
           endpoint: baseURL || cfg.endpoint,
           model: model || cfg.model,
-          systemLen: system.length,
-          droppedSystem: incoming.length - dialogue.length,
+          keptSystem: merged.filter((m) => m.role === 'system').length,
+          appendedLen: suffix.length,
           messages: merged.map((m) => ({ role: m.role, len: String(m.content ?? '').length })),
         };
 
@@ -254,6 +260,7 @@
       persona: String(ai.persona ?? ''),
       style: String(ai.style ?? ''),
       binding: String(ai.binding ?? ''),
+      retrieval: String(ai.retrieval ?? ''),
       prompt: ai.prompt ?? { system: '', user: '' },
     };
   };
@@ -281,7 +288,7 @@
     if (typeof content !== 'string' || content.trim() === '') {
       return { ok: false, error: '模型没有返回内容' };
     }
-    return { ok: true, text: content.trim() };
+    return { ok: true, text: stripSameNameDigressions(content.trim()) };
   };
 
   window.__siteAi = { aiConfig, decryptKeyBlob, loadSiteJson, chatCompletions };
