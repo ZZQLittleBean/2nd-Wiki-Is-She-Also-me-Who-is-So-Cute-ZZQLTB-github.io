@@ -27,25 +27,62 @@
   };
 
   /* ---------- 检索（省流用，不命中也继续聊） ---------- */
+  /** 疑问词/口头语：不参与匹配，否则"张可云是谁"会当成一整个词去搜 */
+  const STOPWORDS = [
+    '是谁', '是什么', '叫什么', '做什么', '干什么', '怎么样', '为什么', '多少',
+    '哪里', '哪个', '哪些', '如何', '请问', '帮我', '一句话', '简单', '说说', '介绍',
+    '一下', '大概', '相关', '内容', '什么', '怎么',
+  ];
+
+  const normalize = (text) => {
+    let out = String(text ?? '');
+    for (const word of STOPWORDS) out = out.split(word).join(' ');
+    return out;
+  };
+
+  const tokensOf = (question) => {
+    const cleaned = normalize(question);
+    const parts = cleaned.split(/[\s，。？！、,.?!：:；;“”"'（）()\[\]]+/).filter((part) => part !== '');
+    const tokens = new Set();
+    for (const part of parts) {
+      if (part.length >= 2) tokens.add(part);
+      /* 中文没有空格：再切 2~4 字的窗口，避免整句当一个词 */
+      for (let size = 2; size <= 4; size += 1) {
+        for (let i = 0; i + size <= part.length; i += 1) tokens.add(part.slice(i, i + size));
+      }
+    }
+    return [...tokens].filter((token) => token.length >= 2);
+  };
+
   const searchSnippets = (question) => {
     const q = String(question ?? '').trim();
     if (q === '' || siteData === null) return [];
-    const tokens = q.split(/[\s，。？！、,.?!]+/).filter((t) => t.length >= 2);
-    const score = (text) => tokens.reduce((sum, token) => (text.includes(token) ? sum + token.length : sum), 0);
+    const tokens = tokensOf(q);
+    if (tokens.length === 0) return [];
+
     const hits = [];
     for (const entry of siteData.entries ?? []) {
       const version = entry?.versions?.[0];
-      const text = (version?.blocks ?? []).map((b) => String(b.text ?? '')).join(' ').slice(0, 1200);
       const title = String(version?.title ?? '');
-      const s = score(`${title} ${text}`);
-      if (s > 0) hits.push({ kind: 'entry', id: String(entry.id ?? ''), title, text, s });
+      const text = (version?.blocks ?? []).map((b) => String(b.text ?? '')).join(' ').slice(0, 2000);
+      let score = 0;
+      for (const token of tokens) {
+        if (title.includes(token)) score += 12;      /* 标题命中权重最高 */
+        else if (text.includes(token)) score += token.length;
+      }
+      if (score > 0) hits.push({ kind: 'entry', id: String(entry.id ?? ''), title, text, score });
     }
     for (const item of siteData.synopsis ?? []) {
-      const text = String(item?.content ?? '').slice(0, 1200);
-      const s = score(`${item?.title ?? ''} ${text}`);
-      if (s > 0) hits.push({ kind: 'synopsis', id: String(item?.chapterId ?? item?.id ?? ''), title: String(item?.title ?? ''), text, s });
+      const title = String(item?.title ?? '');
+      const text = String(item?.content ?? '').slice(0, 2000);
+      let score = 0;
+      for (const token of tokens) {
+        if (title.includes(token)) score += 10;
+        else if (text.includes(token)) score += token.length;
+      }
+      if (score > 0) hits.push({ kind: 'synopsis', id: String(item?.chapterId ?? item?.id ?? ''), title, text, score });
     }
-    return hits.sort((a, b) => b.s - a.s).slice(0, 6);
+    return hits.sort((a, b) => b.score - a.score).slice(0, 6);
   };
 
   /* ---------- Markdown-lite ---------- */
