@@ -5,8 +5,8 @@
  * "浏览器演示模式"（OPFS 本地库），发布到 GitHub 后读者看到的会是空站。
  *
  * 这里用 fetch 实现同一套接口：
- *  · 存档只有一个，名字固定 `site`，数据来自 `/data/site.json`
- *  · 图片来自 `/data/wiki-images/*`（按 manifest 列目录）
+ *  · 存档只有一个，名字固定 `site`，数据来自 `data/site.json`
+ *  · 图片来自 `data/wiki-images/*`（按 manifest 列目录）
  *  · 写操作一律拒绝（静态站点没有写入权限）
  */
 (() => {
@@ -19,12 +19,12 @@
    *   · `site/data.json`       → 带存档名的相对路径
    */
   const TEXT_FILES = {
-    'data.json': '/data/site.json',
-    'about.json': '/data/about.json',
-    'wiki-manifest.json': '/data/wiki-manifest.json',
-    [`${ARCHIVE}/data.json`]: '/data/site.json',
-    [`${ARCHIVE}/about.json`]: '/data/about.json',
-    [`${ARCHIVE}/wiki-manifest.json`]: '/data/wiki-manifest.json',
+    'data.json': 'data/site.json',
+    'about.json': 'data/about.json',
+    'wiki-manifest.json': 'data/wiki-manifest.json',
+    [`${ARCHIVE}/data.json`]: 'data/site.json',
+    [`${ARCHIVE}/about.json`]: 'data/about.json',
+    [`${ARCHIVE}/wiki-manifest.json`]: 'data/wiki-manifest.json',
   };
 
   /** 把 `site/wiki-images/x.jpg` 与 `wiki-images/x.jpg` 统一成后一种 */
@@ -41,7 +41,7 @@
   const loadManifest = async () => {
     if (manifestCache !== null) return manifestCache;
     try {
-      const res = await fetch('/data/wiki-manifest.json', { cache: 'no-store' });
+      const res = await fetch('data/wiki-manifest.json', { cache: 'no-store' });
       manifestCache = res.ok ? await res.json() : [];
     } catch {
       manifestCache = [];
@@ -107,7 +107,7 @@
       const imageName = imageNameOf(path);
       if (imageName === null) throw new Error(`静态站点没有这个文件：${path}`);
       const name = imageName;
-      const res = await fetch(`/data/wiki-images/${encodeURIComponent(name)}`);
+      const res = await fetch(`data/wiki-images/${encodeURIComponent(name)}`);
       if (!res.ok) throw new Error(`读取失败：${name}`);
       return res.arrayBuffer();
     },
@@ -234,7 +234,7 @@
   let siteJsonCache = null;
   const loadSiteJson = async () => {
     if (siteJsonCache !== null) return siteJsonCache;
-    const res = await fetch('/data/site.json', { cache: 'no-store' });
+    const res = await fetch('data/site.json', { cache: 'no-store' });
     siteJsonCache = res.ok ? await res.json() : {};
     return siteJsonCache;
   };

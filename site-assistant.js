@@ -17,7 +17,7 @@
   let siteData = null;
   const loadSite = async () => {
     if (siteData !== null) return siteData;
-    const res = await fetch('/data/site.json', { cache: 'no-store' });
+    const res = await fetch('data/site.json', { cache: 'no-store' });
     siteData = res.ok ? await res.json() : {};
     for (const entry of siteData.entries ?? []) {
       const title = String(entry?.versions?.[0]?.title ?? entry?.code ?? entry?.id ?? '').trim();
