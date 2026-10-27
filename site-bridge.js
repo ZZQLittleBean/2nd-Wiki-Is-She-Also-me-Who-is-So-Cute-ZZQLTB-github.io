@@ -333,7 +333,29 @@
     if (typeof content !== 'string' || content.trim() === '') {
       return { ok: false, error: '模型没有返回内容' };
     }
-    return { ok: true, text: stripSameNameDigressions(content.trim()) };
+    /* 就地过滤（不依赖外部定义，避免作用域/缓存问题） */
+    const patterns = [
+      /不止\s*(?:一个|一位|一名|一种|这?一?位)/,
+      /并不止/,
+      /No[_ ]?\d+\s*世界/,
+      /同名的(?:人|角色|词条)/,
+    ];
+    const cleaned = content
+      .trim()
+      .split('\n')
+      .map((line) => {
+        const trimmed = line.trim();
+        if (trimmed === '') return line;
+        const survived = trimmed
+          .split(/(?<=[。！？；])/u)
+          .filter((part) => !patterns.some((re) => re.test(part.trim())))
+          .join('')
+          .trim();
+        return survived;
+      })
+      .filter((line, index, arr) => !(line === '' && arr[index - 1] === ''))
+      .join('\n');
+    return { ok: true, text: cleaned };
   };
 
   window.__siteAi = { aiConfig, decryptKeyBlob, loadSiteJson, chatCompletions };
