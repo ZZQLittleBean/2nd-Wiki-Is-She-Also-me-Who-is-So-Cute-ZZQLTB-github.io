@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>微光维基</title>
-    <script type="module" crossorigin src="./assets/index-CmAVmdHq.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BUJsAGSw.css">
+    <title>微光维基</title>
+    <script type="module" crossorigin src="./assets/index-DLHphdt9.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BsGlnTAM.css">
   </head>
   <body>
     <div class="app" data-app data-loading>
@@ -32,12 +32,22 @@
             <span>云云酱</span>
             <button data-assistant-close aria-label="收起">×</button>
           </header>
-          <p class="assistant__hint">问答功能需要站点管理员配置模型后才能使用。</p>
+          <p class="assistant__hint" data-assistant-hint>问答功能需要站点管理员配置模型后才能使用。</p>
+          <!-- 口令解锁：站点是公开的，密钥只有输入正确口令才能解开 -->
+          <div class="assistant__passrow" data-assistant-passrow>
+            <input class="assistant__pass" type="password" data-assistant-pass placeholder="访问口令" />
+            <button class="assistant__unlock" data-assistant-unlock>解锁</button>
+          </div>
+          <div class="assistant__log" data-assistant-log></div>
+          <div class="assistant__compose">
+            <input class="assistant__input" data-assistant-input placeholder="问点什么…" />
+            <button class="assistant__send" data-assistant-send>发送</button>
+          </div>
         </div>
         <button class="assistant__toggle" data-assistant-toggle aria-label="打开云云酱">云</button>
       </div>
 
       <div class="error" data-error-message></div>
-    </div>
+    </div>
   </body>
 </html>
