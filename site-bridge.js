@@ -238,15 +238,25 @@
      * 只有**成功**才缓存：页面早期如果读失败（例如还没确定基址），
      * 之前会把空对象永久记住，导致云云酱一直报"没有配置"。
      */
-    try {
-      const res = await fetch('data/site.json', { cache: 'no-store' });
-      if (!res.ok) return {};
-      const parsed = await res.json();
-      if (parsed !== null && typeof parsed === 'object') siteJsonCache = parsed;
-      return parsed;
-    } catch {
-      return {};
+    /*
+     * 候选路径：站点可能部署在子路径下（GitHub Pages 的 /repo/），
+     * 也可能没有尾部斜杠，所以几种写法都试。
+     */
+    const candidates = ['data/site.json', './data/site.json', '../data/site.json'];
+    for (const candidate of candidates) {
+      try {
+        const res = await fetch(candidate, { cache: 'no-store' });
+        if (!res.ok) continue;
+        const parsed = await res.json();
+        if (parsed !== null && typeof parsed === 'object') {
+          siteJsonCache = parsed;
+          return parsed;
+        }
+      } catch {
+        /* 换下一个候选 */
+      }
     }
+    return {};
   };
 
   const PASS_KEY = 'glight.site.passphrase';

@@ -78,10 +78,12 @@
 
   /* ---------- 面板 DOM ---------- */
   const css = `
-    .site-ai-ball { position: fixed; right: 18px; bottom: 18px; width: 56px; height: 56px; border-radius: 999px;
-      background: var(--surface-0, #fffdfa); border: 1px solid var(--line-strong, #c8bfb2);
-      box-shadow: 0 8px 24px rgb(0 0 0 / .18); cursor: pointer; z-index: 99990; overflow: hidden; padding: 0; }
-    .site-ai-ball img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* 悬浮按钮：直接显示云云酱原图，不做圆形容器（用户明确要求） */
+    .site-ai-ball { position: fixed; right: 14px; bottom: 12px; width: auto; height: auto;
+      border: none; border-radius: 0; background: transparent; box-shadow: none;
+      cursor: pointer; z-index: 99990; padding: 0; }
+    .site-ai-ball img { width: 96px; height: auto; display: block; object-fit: contain;
+      filter: drop-shadow(0 6px 16px rgb(0 0 0 / .22)); }
     .site-ai { position: fixed; right: 16px; bottom: 16px; width: 380px; height: min(720px, 82vh);
       display: none; flex-direction: column; z-index: 99991; background: var(--surface-0, #fffdfa);
       border: 1px solid var(--line-strong, #c8bfb2); border-radius: 10px;

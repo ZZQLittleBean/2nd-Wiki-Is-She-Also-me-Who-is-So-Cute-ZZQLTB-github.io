@@ -8,6 +8,9 @@
 (() => {
   const HIDE_TEXTS = ['编辑', '新建', '导入', '导出', '保存', '删除', '管理'];
   const HIDE_SELECTORS = [
+    '#welcome-modal',
+    '#welcome-page',
+    '#quick-setup-page',
     '[data-edit-toggle]',
     '#btn-edit-entry',
     '#btn-add-entry',
