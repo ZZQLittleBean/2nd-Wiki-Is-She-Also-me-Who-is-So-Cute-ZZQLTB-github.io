@@ -234,9 +234,19 @@
   let siteJsonCache = null;
   const loadSiteJson = async () => {
     if (siteJsonCache !== null) return siteJsonCache;
-    const res = await fetch('data/site.json', { cache: 'no-store' });
-    siteJsonCache = res.ok ? await res.json() : {};
-    return siteJsonCache;
+    /*
+     * 只有**成功**才缓存：页面早期如果读失败（例如还没确定基址），
+     * 之前会把空对象永久记住，导致云云酱一直报"没有配置"。
+     */
+    try {
+      const res = await fetch('data/site.json', { cache: 'no-store' });
+      if (!res.ok) return {};
+      const parsed = await res.json();
+      if (parsed !== null && typeof parsed === 'object') siteJsonCache = parsed;
+      return parsed;
+    } catch {
+      return {};
+    }
   };
 
   const PASS_KEY = 'glight.site.passphrase';
