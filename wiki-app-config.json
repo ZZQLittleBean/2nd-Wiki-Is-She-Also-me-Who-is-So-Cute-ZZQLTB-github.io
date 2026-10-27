@@ -1,0 +1,6 @@
+{
+  "appName": "Glight微光Wiki",
+  "description": "修改 appName 后，重新打开应用即可改变窗口标题名称（无需重新打包）。",
+  "windowWidth": 1280,
+  "windowHeight": 820
+}

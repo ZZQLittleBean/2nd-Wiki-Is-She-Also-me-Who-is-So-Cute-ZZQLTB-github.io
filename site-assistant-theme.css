@@ -1,0 +1,83 @@
+/**
+ * 站点上的云云酱外观对齐（与本地桌面版一致）。
+ *
+ * 旧版助手是"右侧固定的 340×620 白框 + 自己的头像图"；
+ * 本地版是"圆形悬浮球 + 右侧 380 宽面板 / 移动端底部抽屉"，
+ * 并且用统一的暖色 token。这里只做覆盖，不动旧版逻辑。
+ */
+
+:root {
+  --glight-assistant-w: 380px;
+}
+
+/* 悬浮球：用本地版 logo，圆形、带柔和阴影 */
+.assistant-panel .assistant-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-0, #fffdfa);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  border: 1px solid var(--line-strong, #c8bfb2);
+}
+
+.assistant-panel .assistant-avatar img {
+  object-fit: cover;
+}
+
+/* 展开的面板：与本地版同宽、同圆角、同边框色 */
+.assistant-panel .assistant-panel-body {
+  width: var(--glight-assistant-w);
+  height: min(760px, 80vh);
+  max-height: 80vh;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong, #c8bfb2);
+  background: var(--surface-0, #fffdfa);
+  box-shadow: -8px 0 28px rgb(0 0 0 / 0.12);
+  font-family: var(--design-body-family, var(--custom-font, 'Noto Sans SC', sans-serif));
+  color: var(--ink-0, #2b2724);
+}
+
+/* 面板内的标题栏/按钮跟随暖色 token */
+.assistant-panel-body .assistant-header,
+.assistant-panel-body [class*='header'] {
+  border-bottom-color: var(--line, #ded7cd);
+}
+
+.assistant-panel-body button {
+  border-radius: 6px;
+}
+
+.assistant-panel-body input,
+.assistant-panel-body textarea,
+.assistant-panel-body select {
+  border-radius: 6px;
+  border-color: var(--line, #ded7cd);
+  background: var(--surface-1, #fffdfa);
+  color: var(--ink-0, #2b2724);
+}
+
+/* 移动端：改成底部抽屉（与本地版 Bottom Sheet 一致） */
+@media (max-width: 720px) {
+  .assistant-panel {
+    right: 8px;
+    left: 8px;
+    top: auto;
+    bottom: 8px;
+    transform: none;
+    align-items: flex-end;
+  }
+
+  .assistant-panel .assistant-panel-body {
+    width: 100%;
+    height: min(72vh, 620px);
+    max-height: 72vh;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -8px 28px rgb(0 0 0 / 0.16);
+  }
+
+  .assistant-panel .assistant-avatar {
+    width: 56px;
+    height: 56px;
+  }
+}
