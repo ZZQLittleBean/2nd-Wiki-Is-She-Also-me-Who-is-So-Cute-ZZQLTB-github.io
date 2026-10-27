@@ -287,6 +287,31 @@
 
 
   /** 直连 OpenAI 兼容接口（浏览器里跑，不走主进程） */
+  /* ---- 回答过滤：剔除"同名词条清单"（与桌面版同一套句式） ---- */
+  const DIGRESSION_PATTERNS = [
+    /不止\s*(?:一个|一位|一名|一种|这?一?位)/,
+    /并不止/,
+    /No[_ ]?\d+\s*世界/,
+    /同名的(?:人|角色|词条)/,
+    /另一个(?:世界|版本)?的(?:自己|同名)/,
+  ];
+
+  const stripSameNameDigressions = (answer) => {
+    const kept = [];
+    for (const line of String(answer ?? '').split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed === '') {
+        kept.push(line);
+        continue;
+      }
+      const parts = trimmed.split(/(?<=[。！？；])/u);
+      const survivors = parts.filter((part) => !DIGRESSION_PATTERNS.some((re) => re.test(part.trim())));
+      const rebuilt = survivors.join('').trim();
+      if (rebuilt !== '') kept.push(rebuilt);
+    }
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  };
+
   const chatCompletions = async ({ endpoint, apiKey, model, messages, temperature }) => {
     const res = await fetch(`${String(endpoint).replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
